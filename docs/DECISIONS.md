@@ -141,3 +141,13 @@ Format wpisu: data, decyzja, uzasadnienie, konsekwencje.
 **Uzasadnienie:** test 50/50 dowodzi, że przebiegi są **wzajemnie** identyczne, ale przeszedłby także wtedy, gdyby zmiana reguł przesunęła wszystkie 50 przebiegów tak samo. Golden log domyka tę lukę — wiąże wynik z zatwierdzonym zachowaniem. Format tekstowy wybrano zamiast JSON, bo rdzeń **już** produkuje obie kanoniczne reprezentacje (`get_canonical_log()`, `get_canonical_snapshot()`); JSON wymagałby drugiego serializatora i wprowadzał ryzyko zależności od kolejności kluczy `Dictionary`. Publiczne API rdzenia nie zostało zmienione.
 
 **Konsekwencje:** każda zmiana reguł FOV, FSM, kolejności faz ticka albo danych scenariusza zapali ten test na czerwono z dokładnym wskazaniem pierwszego różniącego się zdarzenia. **Czerwonego testu nie wolno „naprawiać" regeneracją fixture'u** — najpierw trzeba ustalić, czy zmiana zachowania była zamierzona. Skuteczność mechanizmu zweryfikowano eksperymentalnie: tymczasowa zmiana `guard_view_range` z 6 na 7 wywołała failure ze wskazaniem indeksu 6 i wartości `37|guard_01|SUSPICION|…` kontra `36|guard_01|SUSPICION|…`; zmianę cofnięto.
+
+---
+
+## 2026-09-21 — Wariant sukcesu jako lokalna modyfikacja danych, bez helpera w rdzeniu
+
+**Decyzja:** druga ścieżka terminalna (`INTRUDER_SUCCESS`) jest pokryta fixturem `tests/fixtures/l0_success_golden_log.txt`. Wariant powstaje przez pobranie świeżych danych z `ScenarioL0.create()` i ustawienie w teście jednego pola: `guard_view_range = 4`. **Nie dodano helpera `create_success_variant()` w `ScenarioL0`** ani żadnej innej zmiany w rdzeniu.
+
+**Uzasadnienie:** `ScenarioL0.create()` za każdym razem buduje nowy obiekt z nowymi tablicami, a `Simulation.initialize()` i tak wykonuje `duplicate_data()`. Modyfikacja zwróconego obiektu jest więc całkowicie izolowana — nie ma współdzielonego stanu, który mogłaby zepsuć. Helper w rdzeniu rozszerzałby publiczne API o dane istotne wyłącznie dla testu. Wartość 4 wybrano po pomiarze wszystkich kandydatów: daje 11 zdarzeń i jako jedyna pokrywa przy okazji pełny cykl `SUSPICION → RETURN → PATROL` (strażnik dostrzega intruza na jeden tick, gubi cel, wraca do patrolu, intruz kończy trasę w 40 ticku). Warianty 1–3 dają 8–9 zdarzeń i strażnik nic nie widzi.
+
+**Konsekwencje:** sukces wynika z normalnej pracy silnika na innych danych wejściowych — nie ma wstrzykiwania zdarzeń, wymuszania outcome ani omijania `step()`. Osobny test pilnuje, że wariant nie przecieka do danych domyślnych. Gdyby w przyszłości pojawił się trzeci wariant, warto rozważyć wspólny helper testowy — ale dopiero wtedy, nie „na zapas".
