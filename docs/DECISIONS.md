@@ -165,3 +165,13 @@ Format wpisu: data, decyzja, uzasadnienie, konsekwencje.
 **Kolejność warunków, potwierdzona empirycznie:** w fazie 7 `_resolve_outcome()` sprawdza kolejno `DETECTED` → `SUCCESS` → `tick >= max_ticks`, więc **tick limit ma najniższy priorytet**. Uruchomienie z `max_ticks = 38` kończy się `INTRUDER_DETECTED`, nie `TICK_LIMIT` — mimo że w tym samym ticku limit też jest osiągnięty.
 
 **Konsekwencje:** wszystkie trzy terminalne wyniki silnika mają teraz golden regression. Zmiana kolejności faz, warunków terminalnych albo reguł patrolu zapali odpowiedni fixture ze wskazaniem pierwszej różnicy. Zmiana któregokolwiek fixture'u wymaga świadomej decyzji i wpisu w tym pliku.
+
+---
+
+## 2026-09-21 — Kontrakt priorytetu wyników terminalnych
+
+**Decyzja:** gdy w tym samym ticku prawdziwe są jednocześnie wykrycie intruza i warunek `tick >= max_ticks`, wynikiem jest **`INTRUDER_DETECTED`, nie `TICK_LIMIT`**. Reguła jest pilnowana testem `tests/test_simulation.gd::test_detection_has_priority_over_tick_limit_on_same_tick`.
+
+**Uzasadnienie:** priorytet wynika wyłącznie z kolejności gałęzi `if/elif` w `Simulation._resolve_outcome()` (`DETECTED` → `SUCCESS` → `tick >= max_ticks`). Do tej pory była to własność udokumentowana i zmierzona, ale **niepilnowana żadnym testem**. Sprawdzono to eksperymentalnie: po tymczasowym odwróceniu dwóch gałęzi **wszystkie 16 testów golden log przeszło bez zmian**, bo w żadnym z trzech zatwierdzonych przebiegów remis nie występuje. Nowy test tworzy remis jawnie, ustawiając `max_ticks = 38` na świeżych danych — dokładnie w ticku, w którym zapada wykrycie.
+
+**Konsekwencje:** odwrócenie kolejności warunków terminalnych natychmiast zapala ten jeden test, ze wskazaniem błędnego outcome i błędnego powodu wpisu `FINISHED`. Test nie jest czwartym golden fixturem — sprawdza semantyczny kontrakt, a nie pełny przebieg. Zmiana kolejności warunków wymaga świadomej decyzji i wpisu w tym pliku.

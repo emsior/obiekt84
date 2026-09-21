@@ -244,3 +244,70 @@ func test_snapshot_is_a_copy() -> void:
 
 	assert_int(simulation.get_state_snapshot()["tick"]).is_equal(0)
 	assert_str(String(simulation.get_state_snapshot()["guard_state"])).is_equal(GuardFsm.STATE_PATROL)
+
+
+## Tick, w ktorym wykrycie intruza i wyczerpanie limitu zachodza jednoczesnie.
+## Przy domyslnych danych wykrycie wypada w 38 ticku, wiec max_ticks = 38 tworzy
+## remis: oba warunki terminalne sa w tej samej fazie 7 prawdziwe.
+const TIE_MAX_TICKS := 38
+
+
+## Kontrakt priorytetu wynikow terminalnych: gdy w jednym ticku prawdziwe jest
+## i wykrycie intruza, i tick >= max_ticks, wygrywa INTRUDER_DETECTED.
+##
+## Kolejnosc galezi w Simulation._resolve_outcome() jest jedynym zrodlem tej
+## reguly. Golden logi jej nie pilnuja — w zadnym z nich remis nie wystepuje,
+## wiec odwrocenie kolejnosci warunkow przeszloby tamte testy niezauwazone.
+func test_detection_has_priority_over_tick_limit_on_same_tick() -> void:
+	var scenario := ScenarioL0.create()
+	scenario.max_ticks = TIE_MAX_TICKS
+
+	var simulation := Simulation.new()
+	simulation.initialize(scenario)
+
+	var steps := 0
+	while not simulation.is_finished() and steps < TIE_MAX_TICKS:
+		simulation.step()
+		steps += 1
+
+	# Remis jest rzeczywisty: przebieg zatrzymal sie dokladnie na limicie.
+	assert_bool(simulation.is_finished()) \
+		.append_failure_message("przebieg nie osiagnal stanu terminalnego") \
+		.is_true()
+	assert_int(simulation.get_tick()) \
+		.append_failure_message("przebieg nie zatrzymal sie na ticku remisu") \
+		.is_equal(TIE_MAX_TICKS)
+	assert_bool(simulation.get_tick() >= scenario.max_ticks) \
+		.append_failure_message("warunek limitu tickow nie byl spelniony, brak remisu") \
+		.is_true()
+
+	# Rozstrzygniecie remisu.
+	assert_str(simulation.get_outcome()) \
+		.append_failure_message("wykrycie intruza musi wyprzedzac limit tickow w tym samym ticku") \
+		.is_equal(SimulationState.OUTCOME_INTRUDER_DETECTED)
+	assert_str(simulation.get_outcome()) \
+		.append_failure_message("limit tickow przejal pierwszenstwo nad wykryciem") \
+		.is_not_equal(SimulationState.OUTCOME_TICK_LIMIT)
+
+	var canonical := simulation.get_canonical_log()
+	assert_str(canonical) \
+		.append_failure_message("log nie zawiera wykrycia intruza") \
+		.contains("|%s|%s|" % [ScenarioL0.INTRUDER_ID, IntruderScript.STATE_DETECTED])
+	assert_str(canonical) \
+		.append_failure_message("brak terminalnego wpisu o wykryciu") \
+		.contains("|%s|FINISHED|intruder_detected" % Simulation.SUBJECT_SIMULATION)
+	assert_str(canonical) \
+		.append_failure_message("log zawiera terminalny wpis limitu tickow") \
+		.not_contains("|%s|FINISHED|tick_limit" % Simulation.SUBJECT_SIMULATION)
+
+	# Po rozstrzygnieciu remisu kolejny step() nadal jest no-op.
+	var tick_before := simulation.get_tick()
+	var log_before := canonical
+	var snapshot_before := simulation.get_canonical_snapshot()
+
+	simulation.step()
+	simulation.step()
+
+	assert_int(simulation.get_tick()).is_equal(tick_before)
+	assert_str(simulation.get_canonical_log()).is_equal(log_before)
+	assert_str(simulation.get_canonical_snapshot()).is_equal(snapshot_before)
