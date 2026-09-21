@@ -1,0 +1,18 @@
+# Godot 4+ specific ignores
+.godot/
+/android/
+
+# Artefakty eksportu i buildów
+/build/
+/export/
+
+# Raporty testów GdUnit4 (domyślny katalog res://reports/)
+/reports/
+
+# Logi i pliki tymczasowe
+*.log
+*.tmp
+
+# Lokalne ustawienia IDE
+/.vscode/
+/.idea/
