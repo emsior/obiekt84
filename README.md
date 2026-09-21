@@ -56,7 +56,7 @@ $env:GODOT_BIN = 'C:\sciezka\do\Godot_v4.7.2-stable_win64_console.exe'
 "%GODOT_BIN%" --headless --path . -s res://addons/gdUnit4/bin/GdUnitCmdTool.gd -a tests --ignoreHeadlessMode
 ```
 
-Wynik ostatniego uruchomienia: **58 przypadków testowych, 0 błędów, 0 failures, 0 orphans, exit code 0.**
+Wynik ostatniego uruchomienia: **63 przypadki testowe, 0 błędów, 0 failures, 0 flaky, 0 skipped, 0 orphans, exit code 0.**
 
 Flaga `--ignoreHeadlessMode` jest wymagana, ponieważ GdUnit4 domyślnie odmawia pracy w trybie headless. Nasze testy nie używają `InputEvent`, więc to ograniczenie ich nie dotyczy.
 
@@ -66,9 +66,26 @@ Flaga `--ignoreHeadlessMode` jest wymagana, ponieważ GdUnit4 domyślnie odmawia
 call addons\gdUnit4\runtest.cmd -a tests
 ```
 
-Exit code 0, 58/58 przypadków. Uwaga: `runtest.cmd` uruchamia właściwy przebieg **w trybie okienkowym**, nie headless, i w tym repozytorium działa poprawnie wyłącznie wywołany z CMD lub PowerShell. Wywołany przez Git Bash zawiesza się bez wypisania czegokolwiek. Do CI używaj komendy podstawowej.
+Exit code 0, 63/63 przypadków. Uwaga: `runtest.cmd` uruchamia właściwy przebieg **w trybie okienkowym**, nie headless, i w tym repozytorium działa poprawnie wyłącznie wywołany z CMD lub PowerShell. Wywołany przez Git Bash zawiesza się bez wypisania czegokolwiek. Do CI używaj komendy podstawowej.
 
 Raporty XML i HTML lądują w `reports/` (katalog ignorowany przez Git).
+
+### Regresja golden log
+
+`tests/test_l0_golden_log.gd` porównuje bieżący przebieg incydentu L0 z zatwierdzonym
+artefaktem `tests/fixtures/l0_incident_golden_log.txt`. Chroni przed zmianą reguł,
+której nie wykryje test 50/50 — bo tamten dowodzi tylko, że przebiegi są wzajemnie
+identyczne, a nie że nadal zgadzają się z zatwierdzonym zachowaniem.
+
+Format fixture'u: plik tekstowy z dwiema sekcjami. `[EVENT_LOG]` zawiera kanoniczny
+log (`tick|subject|event|reason`, jeden wiersz na zdarzenie), `[FINAL_STATE]` —
+kanoniczny snapshot końcowy (`klucz=wartość`, stała kolejność pól). Bez czasu
+systemowego, identyfikatorów instancji i danych zależnych od kolejności hash map.
+
+**Fixture aktualizuje się wyłącznie świadomie**, po zamierzonej zmianie zasad L0 —
+razem ze zmianą testów i wpisem w `docs/DECISIONS.md`. Test nigdy go nie nadpisuje.
+Czerwonego testu golden log **nie wolno "naprawiać" przez regenerację fixture'u**:
+najpierw ustal, czy zmiana zachowania była zamierzona.
 
 ## Zakres L0
 
@@ -101,6 +118,7 @@ scripts/presentation/ widok poziomu, widok podmiotu, adapter czasu
 scripts/ui/          HUD
 scenes/              main.tscn, level_l0.tscn
 tests/               testy GdUnit4
+tests/fixtures/      zatwierdzony golden log incydentu L0
 docs/                MVP_L0, ARCHITECTURE, DECISIONS, PLAYTEST
 addons/gdUnit4/      vendorowany plugin w przypiętej wersji 6.2.1
 ```

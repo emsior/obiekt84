@@ -131,3 +131,13 @@ Format wpisu: data, decyzja, uzasadnienie, konsekwencje.
 **Uzasadnienie:** poprzednia nazwa katalogu `object-'84` zawierała apostrof, który psuje skrypty powłoki, pliki `.cmd` i ścieżki w CI. Nazwa projektu została ujednolicona z nazwą roboczą.
 
 **Konsekwencje:** `config/features`, renderer (`d3d12`) i silnik fizyki 3D (Jolt) pozostały nietknięte, mimo że L0 ich nie używa.
+
+---
+
+## 2026-09-21 — Regresja golden log dla incydentu L0
+
+**Decyzja:** zatwierdzony przebieg incydentu L0 jest zapisany jako artefakt repozytorium `tests/fixtures/l0_incident_golden_log.txt` i porównywany przez `tests/test_l0_golden_log.gd`. Format: plik tekstowy z dwiema sekcjami — `[EVENT_LOG]` z kanonicznym logiem (`tick|subject|event|reason`) i `[FINAL_STATE]` z kanonicznym snapshotem (`klucz=wartość`). Fixture **nigdy** nie jest nadpisywany przez test; aktualizuje się wyłącznie świadomie, razem ze zmianą zasad L0 i wpisem w tym pliku.
+
+**Uzasadnienie:** test 50/50 dowodzi, że przebiegi są **wzajemnie** identyczne, ale przeszedłby także wtedy, gdyby zmiana reguł przesunęła wszystkie 50 przebiegów tak samo. Golden log domyka tę lukę — wiąże wynik z zatwierdzonym zachowaniem. Format tekstowy wybrano zamiast JSON, bo rdzeń **już** produkuje obie kanoniczne reprezentacje (`get_canonical_log()`, `get_canonical_snapshot()`); JSON wymagałby drugiego serializatora i wprowadzał ryzyko zależności od kolejności kluczy `Dictionary`. Publiczne API rdzenia nie zostało zmienione.
+
+**Konsekwencje:** każda zmiana reguł FOV, FSM, kolejności faz ticka albo danych scenariusza zapali ten test na czerwono z dokładnym wskazaniem pierwszego różniącego się zdarzenia. **Czerwonego testu nie wolno „naprawiać" regeneracją fixture'u** — najpierw trzeba ustalić, czy zmiana zachowania była zamierzona. Skuteczność mechanizmu zweryfikowano eksperymentalnie: tymczasowa zmiana `guard_view_range` z 6 na 7 wywołała failure ze wskazaniem indeksu 6 i wartości `37|guard_01|SUSPICION|…` kontra `36|guard_01|SUSPICION|…`; zmianę cofnięto.
