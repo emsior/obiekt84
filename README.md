@@ -56,7 +56,7 @@ $env:GODOT_BIN = 'C:\sciezka\do\Godot_v4.7.2-stable_win64_console.exe'
 "%GODOT_BIN%" --headless --path . -s res://addons/gdUnit4/bin/GdUnitCmdTool.gd -a tests --ignoreHeadlessMode
 ```
 
-Wynik ostatniego uruchomienia: **68 przypadków testowych, 0 błędów, 0 failures, 0 flaky, 0 skipped, 0 orphans, exit code 0.**
+Wynik ostatniego uruchomienia: **74 przypadki testowe, 0 błędów, 0 failures, 0 flaky, 0 skipped, 0 orphans, exit code 0.**
 
 Flaga `--ignoreHeadlessMode` jest wymagana, ponieważ GdUnit4 domyślnie odmawia pracy w trybie headless. Nasze testy nie używają `InputEvent`, więc to ograniczenie ich nie dotyczy.
 
@@ -66,25 +66,29 @@ Flaga `--ignoreHeadlessMode` jest wymagana, ponieważ GdUnit4 domyślnie odmawia
 call addons\gdUnit4\runtest.cmd -a tests
 ```
 
-Exit code 0, 68/68 przypadków. Uwaga: `runtest.cmd` uruchamia właściwy przebieg **w trybie okienkowym**, nie headless, i w tym repozytorium działa poprawnie wyłącznie wywołany z CMD lub PowerShell. Wywołany przez Git Bash zawiesza się bez wypisania czegokolwiek. Do CI używaj komendy podstawowej.
+Exit code 0, 74/74 przypadków. Uwaga: `runtest.cmd` uruchamia właściwy przebieg **w trybie okienkowym**, nie headless, i w tym repozytorium działa poprawnie wyłącznie wywołany z CMD lub PowerShell. Wywołany przez Git Bash zawiesza się bez wypisania czegokolwiek. Do CI używaj komendy podstawowej.
 
 Raporty XML i HTML lądują w `reports/` (katalog ignorowany przez Git).
 
 ### Regresja golden log
 
-`tests/test_l0_golden_log.gd` porównuje bieżące przebiegi L0 z **dwoma** zatwierdzonymi
-artefaktami — po jednym na każdą ścieżkę terminalną:
+`tests/test_l0_golden_log.gd` porównuje bieżące przebiegi L0 z **trzema** zatwierdzonymi
+artefaktami — po jednym na każdy terminalny wynik silnika:
 
 | Fixture | Ścieżka | Outcome |
 |---|---|---|
 | `tests/fixtures/l0_incident_golden_log.txt` | wykrycie intruza przez strażnika | `INTRUDER_DETECTED` |
 | `tests/fixtures/l0_success_golden_log.txt` | intruz kończy trasę | `INTRUDER_SUCCESS` |
+| `tests/fixtures/l0_tick_limit_golden_log.txt` | wyczerpanie limitu ticków | `TICK_LIMIT` |
 
-Wariant sukcesu to te same dane z `ScenarioL0.create()` z jednym świadomie zmienionym
-parametrem (mniejszy zasięg widzenia strażnika) — sukces wynika z normalnej pracy
-silnika, nie z wymuszenia wyniku. Oba fixture'y chronią przed zmianą reguł, której nie
-wykryje test 50/50 — bo tamten dowodzi tylko, że przebiegi są wzajemnie identyczne,
-a nie że nadal zgadzają się z zatwierdzonym zachowaniem.
+Warianty sukcesu i limitu to te same dane z `ScenarioL0.create()` z jednym świadomie
+zmienionym polem (odpowiednio: mniejszy zasięg widzenia strażnika, krótszy `max_ticks`).
+Wynik wynika z normalnej pracy silnika, nie z wymuszenia. Fixture'y chronią przed zmianą
+reguł, której nie wykryje test 50/50 — bo tamten dowodzi tylko, że przebiegi są wzajemnie
+identyczne, a nie że nadal zgadzają się z zatwierdzonym zachowaniem.
+
+**Fixture'y są zatwierdzonym kontraktem zachowania L0.** Czerwony test golden log oznacza
+albo regresję, albo zamierzoną zmianę reguł — nigdy powód do regeneracji pliku.
 
 Format fixture'u: plik tekstowy z dwiema sekcjami. `[EVENT_LOG]` zawiera kanoniczny
 log (`tick|subject|event|reason`, jeden wiersz na zdarzenie), `[FINAL_STATE]` —
@@ -127,7 +131,7 @@ scripts/presentation/ widok poziomu, widok podmiotu, adapter czasu
 scripts/ui/          HUD
 scenes/              main.tscn, level_l0.tscn
 tests/               testy GdUnit4
-tests/fixtures/      dwa zatwierdzone golden logi L0 (wykrycie i sukces)
+tests/fixtures/      trzy zatwierdzone golden logi L0 (wykrycie, sukces, limit)
 docs/                MVP_L0, ARCHITECTURE, DECISIONS, PLAYTEST
 addons/gdUnit4/      vendorowany plugin w przypiętej wersji 6.2.1
 ```

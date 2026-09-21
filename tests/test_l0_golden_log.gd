@@ -17,6 +17,7 @@ extends GdUnitTestSuite
 
 const GOLDEN_FIXTURE := "res://tests/fixtures/l0_incident_golden_log.txt"
 const SUCCESS_FIXTURE := "res://tests/fixtures/l0_success_golden_log.txt"
+const TICK_LIMIT_FIXTURE := "res://tests/fixtures/l0_tick_limit_golden_log.txt"
 const SECTION_EVENT_LOG := "[EVENT_LOG]"
 const SECTION_FINAL_STATE := "[FINAL_STATE]"
 const HARD_TICK_LIMIT := 500
@@ -25,6 +26,11 @@ const HARD_TICK_LIMIT := 500
 ## Przy zasiegu 4 straznik dostrzega intruza na jeden tick, gubi cel, wraca do
 ## patrolu — a intruz konczy trase. Sukces wynika z normalnej pracy silnika.
 const SUCCESS_GUARD_VIEW_RANGE := 4
+
+## Jedyny parametr odrozniajacy wariant tick-limit od danych domyslnych.
+## Limit 20 wypada w trakcie trzeciego boku patrolu: log pokazuje trzy minięte
+## waypointy, a wykrycie (tick 38) i sukces (tick 40) nie maja szans wystapic.
+const TICK_LIMIT_MAX_TICKS := 20
 
 
 # === wspolne helpery ==========================================================
@@ -48,6 +54,14 @@ func _run_to_terminal() -> Simulation:
 func _create_success_scenario() -> ScenarioL0:
 	var scenario := ScenarioL0.create()
 	scenario.guard_view_range = SUCCESS_GUARD_VIEW_RANGE
+	return scenario
+
+
+## Swieze dane domyslne z jednym zmienionym polem: krotszy limit ticków.
+## Silnik konczy przebieg normalna droga — przez wyczerpanie limitu w fazie 7.
+func _create_tick_limit_scenario() -> ScenarioL0:
+	var scenario := ScenarioL0.create()
+	scenario.max_ticks = TICK_LIMIT_MAX_TICKS
 	return scenario
 
 
@@ -307,6 +321,149 @@ func test_success_variant_does_not_mutate_default_scenario() -> void:
 	assert_str(default_simulation.get_outcome()) \
 		.append_failure_message("domyslny scenariusz przestal prowadzic do wykrycia intruza") \
 		.is_equal(SimulationState.OUTCOME_INTRUDER_DETECTED)
+
+
+# === sciezka LIMITU TICKOW (TICK_LIMIT) =======================================
+
+## Tick limit ma najnizszy priorytet w fazie 7 — wykrycie i sukces go wyprzedzaja.
+## Wariant musi konczyc sie wylacznie przez wyczerpanie limitu.
+func test_tick_limit_variant_reaches_terminal_state_within_limit() -> void:
+	var simulation := _run_scenario_to_terminal(_create_tick_limit_scenario())
+
+	assert_bool(simulation.is_finished()) \
+		.append_failure_message("wariant tick-limit nie domknal sie w %d krokach" % HARD_TICK_LIMIT) \
+		.is_true()
+	assert_str(simulation.get_outcome()) \
+		.append_failure_message("wariant tick-limit nie konczy sie wyczerpaniem limitu") \
+		.is_equal(SimulationState.OUTCOME_TICK_LIMIT)
+	assert_int(simulation.get_tick()) \
+		.append_failure_message("przebieg nie zatrzymal sie dokladnie na limicie") \
+		.is_equal(TICK_LIMIT_MAX_TICKS)
+
+	# Ani wykrycie, ani sukces nie moga zakonczyc przebiegu wczesniej.
+	var snapshot := simulation.get_state_snapshot()
+	assert_str(String(snapshot["intruder_state"])) \
+		.append_failure_message("intruz osiagnal stan terminalny przed limitem") \
+		.is_equal(IntruderScript.STATE_MOVE)
+	assert_str(simulation.get_canonical_log()) \
+		.append_failure_message("log zawiera wykrycie intruza") \
+		.not_contains("|%s|" % IntruderScript.STATE_DETECTED)
+	assert_str(simulation.get_canonical_log()) \
+		.append_failure_message("log zawiera sukces intruza") \
+		.not_contains("|%s|" % IntruderScript.STATE_SUCCESS)
+
+
+func test_tick_limit_variant_canonical_event_log_matches_golden_fixture() -> void:
+	var fixture := _load_fixture(TICK_LIMIT_FIXTURE)
+	var expected: PackedStringArray = fixture["events"]
+
+	var simulation := _run_scenario_to_terminal(_create_tick_limit_scenario())
+	var canonical := simulation.get_canonical_log()
+	var actual := _canonical_lines(canonical)
+
+	assert_str("\n".join(actual)) \
+		.append_failure_message(_describe_diff(
+			"event log (limit tickow)", expected, actual, simulation.get_canonical_snapshot())) \
+		.is_equal("\n".join(expected))
+
+	assert_str(canonical) \
+		.append_failure_message("brak terminalnego wpisu konczacego przebieg limitem") \
+		.contains("%d|%s|FINISHED|tick_limit" % [TICK_LIMIT_MAX_TICKS, Simulation.SUBJECT_SIMULATION])
+
+
+func test_tick_limit_variant_canonical_final_state_matches_golden_fixture() -> void:
+	var fixture := _load_fixture(TICK_LIMIT_FIXTURE)
+	var expected: PackedStringArray = fixture["state"]
+
+	var simulation := _run_scenario_to_terminal(_create_tick_limit_scenario())
+	var actual := _canonical_lines(simulation.get_canonical_snapshot())
+
+	assert_str("\n".join(actual)) \
+		.append_failure_message(_describe_diff(
+			"stan koncowy (limit tickow)", expected, actual, simulation.get_canonical_snapshot())) \
+		.is_equal("\n".join(expected))
+
+	assert_array(Array(expected)) \
+		.append_failure_message("fixture nie deklaruje terminalnego ticka %d" % TICK_LIMIT_MAX_TICKS) \
+		.contains(["tick=%d" % TICK_LIMIT_MAX_TICKS])
+
+
+func test_tick_limit_golden_fixture_is_well_formed() -> void:
+	var fixture := _load_fixture(TICK_LIMIT_FIXTURE)
+	_assert_fixture_structure(fixture, TICK_LIMIT_FIXTURE)
+	_assert_single_trailing_newline(TICK_LIMIT_FIXTURE)
+
+	var events := Array(fixture["events"] as PackedStringArray)
+	var state := Array(fixture["state"] as PackedStringArray)
+
+	assert_array(state) \
+		.append_failure_message("fixture limitu nie deklaruje outcome=TICK_LIMIT") \
+		.contains(["outcome=%s" % SimulationState.OUTCOME_TICK_LIMIT])
+
+	var joined := "\n".join(fixture["events"] as PackedStringArray)
+	assert_str(joined) \
+		.append_failure_message("fixture limitu nie zawiera wpisu FINISHED") \
+		.contains("|%s|FINISHED|tick_limit" % Simulation.SUBJECT_SIMULATION)
+
+	# W tym wariancie nie moze byc zdarzen terminalnych intruza.
+	assert_str(joined) \
+		.append_failure_message("fixture limitu zawiera niezgodne zdarzenie DETECTED") \
+		.not_contains("|%s|" % IntruderScript.STATE_DETECTED)
+	assert_str(joined) \
+		.append_failure_message("fixture limitu zawiera niezgodne zdarzenie SUCCESS") \
+		.not_contains("|%s|" % IntruderScript.STATE_SUCCESS)
+
+	assert_int(events.size()) \
+		.append_failure_message("fixture limitu ma podejrzanie malo zdarzen") \
+		.is_greater(1)
+	assert_int(state.size()).is_greater(1)
+
+
+## Po wyczerpaniu limitu kolejny step() nie zmienia ticka, logu ani snapshotu.
+## Test ogolny dla wyniku wykrycia jest w tests/test_simulation.gd
+## (test_step_after_terminal_state_is_noop); tutaj sprawdzamy sam tick limit.
+func test_step_after_tick_limit_is_noop() -> void:
+	var simulation := _run_scenario_to_terminal(_create_tick_limit_scenario())
+	assert_str(simulation.get_outcome()).is_equal(SimulationState.OUTCOME_TICK_LIMIT)
+
+	var tick_before := simulation.get_tick()
+	var log_before := simulation.get_canonical_log()
+	var snapshot_before := simulation.get_canonical_snapshot()
+
+	for i in range(10):
+		simulation.step()
+
+	assert_int(simulation.get_tick()) \
+		.append_failure_message("step() po limicie zwiekszyl tick") \
+		.is_equal(tick_before)
+	assert_str(simulation.get_canonical_log()) \
+		.append_failure_message("step() po limicie dopisal zdarzenie") \
+		.is_equal(log_before)
+	assert_str(simulation.get_canonical_snapshot()) \
+		.append_failure_message("step() po limicie zmienil stan") \
+		.is_equal(snapshot_before)
+
+
+## Wariant tick-limit nie moze przeciekac do pozostalych zestawow danych.
+func test_tick_limit_variant_does_not_mutate_default_or_success_scenarios() -> void:
+	var limited := _run_scenario_to_terminal(_create_tick_limit_scenario())
+	assert_str(limited.get_outcome()).is_equal(SimulationState.OUTCOME_TICK_LIMIT)
+
+	var default_scenario := ScenarioL0.create()
+	assert_int(default_scenario.max_ticks) \
+		.append_failure_message("wariant tick-limit zmutowal domyslny limit tickow") \
+		.is_not_equal(TICK_LIMIT_MAX_TICKS)
+	assert_str(_run_scenario_to_terminal(default_scenario).get_outcome()) \
+		.append_failure_message("domyslny scenariusz przestal prowadzic do wykrycia intruza") \
+		.is_equal(SimulationState.OUTCOME_INTRUDER_DETECTED)
+
+	var success_scenario := _create_success_scenario()
+	assert_int(success_scenario.max_ticks) \
+		.append_failure_message("wariant tick-limit zmutowal dane wariantu sukcesu") \
+		.is_not_equal(TICK_LIMIT_MAX_TICKS)
+	assert_str(_run_scenario_to_terminal(success_scenario).get_outcome()) \
+		.append_failure_message("wariant sukcesu przestal prowadzic do sukcesu intruza") \
+		.is_equal(SimulationState.OUTCOME_INTRUDER_SUCCESS)
 
 
 # === ochrona eksportu =========================================================

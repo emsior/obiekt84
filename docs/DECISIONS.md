@@ -151,3 +151,17 @@ Format wpisu: data, decyzja, uzasadnienie, konsekwencje.
 **Uzasadnienie:** `ScenarioL0.create()` za każdym razem buduje nowy obiekt z nowymi tablicami, a `Simulation.initialize()` i tak wykonuje `duplicate_data()`. Modyfikacja zwróconego obiektu jest więc całkowicie izolowana — nie ma współdzielonego stanu, który mogłaby zepsuć. Helper w rdzeniu rozszerzałby publiczne API o dane istotne wyłącznie dla testu. Wartość 4 wybrano po pomiarze wszystkich kandydatów: daje 11 zdarzeń i jako jedyna pokrywa przy okazji pełny cykl `SUSPICION → RETURN → PATROL` (strażnik dostrzega intruza na jeden tick, gubi cel, wraca do patrolu, intruz kończy trasę w 40 ticku). Warianty 1–3 dają 8–9 zdarzeń i strażnik nic nie widzi.
 
 **Konsekwencje:** sukces wynika z normalnej pracy silnika na innych danych wejściowych — nie ma wstrzykiwania zdarzeń, wymuszania outcome ani omijania `step()`. Osobny test pilnuje, że wariant nie przecieka do danych domyślnych. Gdyby w przyszłości pojawił się trzeci wariant, warto rozważyć wspólny helper testowy — ale dopiero wtedy, nie „na zapas".
+
+---
+
+## 2026-09-21 — Trzeci golden fixture: terminalna ścieżka TICK_LIMIT
+
+**Decyzja:** ostatni terminalny wynik silnika (`OUTCOME_TICK_LIMIT`) jest pokryty fixturem `tests/fixtures/l0_tick_limit_golden_log.txt`. Wariant powstaje przez pobranie świeżych danych z `ScenarioL0.create()` i ustawienie w teście jednego pola: `max_ticks = 20`. Podobnie jak wariant sukcesu, **żyje wyłącznie w testach** — w `scripts/core/` nie ma ani helpera, ani zmiany API.
+
+**Uzasadnienie wyboru limitu 20:** wykrycie następuje w 38 ticku, a sukces w 40, więc każdy limit ≤ 37 daje `TICK_LIMIT`. Wartość 20 jest kompromisem między minimalizmem a wartością diagnostyczną: log zawiera trzy minięte waypointy (ticki 1, 7, 15) plus wpis terminalny, a limit wypada **w trakcie** czwartego boku patrolu, a nie na waypoincie — dzięki temu widać wyraźnie, że przebieg został ucięty limitem, a nie zbiegiem okoliczności. Limit 1 dałby dwa zdarzenia i zerową wartość diagnostyczną, limit 37 rozciągałby log bez powodu.
+
+**Zabezpieczenie przed wcześniejszym wykryciem lub sukcesem:** nie było potrzebne żadne dodatkowe wyłączanie detekcji. Wystarczyło, że limit wypada przed 38 tickiem. Test jawnie to weryfikuje: sprawdza, że intruz kończy w stanie `MOVE`, a log nie zawiera zdarzeń `DETECTED` ani `SUCCESS`. Reguły FOV, FSM i detekcji pozostały nietknięte.
+
+**Kolejność warunków, potwierdzona empirycznie:** w fazie 7 `_resolve_outcome()` sprawdza kolejno `DETECTED` → `SUCCESS` → `tick >= max_ticks`, więc **tick limit ma najniższy priorytet**. Uruchomienie z `max_ticks = 38` kończy się `INTRUDER_DETECTED`, nie `TICK_LIMIT` — mimo że w tym samym ticku limit też jest osiągnięty.
+
+**Konsekwencje:** wszystkie trzy terminalne wyniki silnika mają teraz golden regression. Zmiana kolejności faz, warunków terminalnych albo reguł patrolu zapali odpowiedni fixture ze wskazaniem pierwszej różnicy. Zmiana któregokolwiek fixture'u wymaga świadomej decyzji i wpisu w tym pliku.
