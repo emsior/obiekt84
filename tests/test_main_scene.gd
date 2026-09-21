@@ -11,6 +11,11 @@ const MAIN_SCENE := "res://scenes/main.tscn"
 const RESTART_CYCLES := 20
 const TICKS_PER_CYCLE := 5
 
+## Indeksy wariantow incydentu (enum ScenarioVariant w simulation_runner.gd).
+const VARIANT_DETECTION := 0
+const VARIANT_SUCCESS := 1
+const VARIANT_TICK_LIMIT := 2
+
 
 func _count_nodes(node: Node) -> int:
 	var count := 1
@@ -195,6 +200,97 @@ func test_overlay_and_log_toggles_change_presentation_state() -> void:
 	assert_int(_simulation_of(scene).get_tick()) \
 		.append_failure_message("przelacznik prezentacji ruszyl symulacje") \
 		.is_equal(tick_before)
+
+
+## Dymny test: każdy wariant startuje od świeżych danych o oczekiwanej konfiguracji.
+## Warianty to wyłącznie inne dane wejściowe tego samego silnika L0.
+func test_selecting_each_variant_restarts_with_expected_configuration() -> void:
+	var runner := scene_runner(MAIN_SCENE)
+	await runner.simulate_frames(1)
+	var scene := runner.scene()
+
+	var expected := [
+		{"variant": VARIANT_DETECTION, "view_range": 6, "max_ticks": 400},
+		{"variant": VARIANT_SUCCESS, "view_range": 4, "max_ticks": 400},
+		{"variant": VARIANT_TICK_LIMIT, "view_range": 6, "max_ticks": 20},
+	]
+
+	for case: Dictionary in expected:
+		scene.call("select_variant", case["variant"])
+		var snapshot := _simulation_of(scene).get_state_snapshot()
+
+		assert_int(int(snapshot["tick"])) \
+			.append_failure_message("wariant %d: tick po wyborze" % int(case["variant"])) \
+			.is_equal(0)
+		assert_int(int(snapshot["guard_view_range"])) \
+			.append_failure_message("wariant %d: zasieg widzenia straznika" % int(case["variant"])) \
+			.is_equal(int(case["view_range"]))
+		assert_int(int(snapshot["max_ticks"])) \
+			.append_failure_message("wariant %d: limit tickow" % int(case["variant"])) \
+			.is_equal(int(case["max_ticks"]))
+		assert_bool(bool(scene.get("_running"))) \
+			.append_failure_message("wariant %d: przebieg nie jest w stanie PAUSED" % int(case["variant"])) \
+			.is_false()
+
+
+## Dymny test: zmiana wariantu kasuje wynik terminalny i panel zdarzeń.
+func test_variant_selection_clears_terminal_state_and_event_log() -> void:
+	var runner := scene_runner(MAIN_SCENE)
+	await runner.simulate_frames(1)
+	var scene := runner.scene()
+	var hud := scene.get_node("HudLayer/Hud") as Hud
+
+	hud.start_requested.emit()
+	_fire_ticks(scene, 60)
+
+	var before := _simulation_of(scene)
+	assert_bool(before.is_finished()) \
+		.append_failure_message("wariant domyslny nie domknal sie") \
+		.is_true()
+	assert_array(before.get_event_log()).is_not_empty()
+
+	scene.call("select_variant", VARIANT_TICK_LIMIT)
+	var after := _simulation_of(scene)
+
+	assert_bool(before == after) \
+		.append_failure_message("wybor wariantu nie utworzyl nowej instancji Simulation") \
+		.is_false()
+	assert_int(after.get_tick()).is_equal(0)
+	assert_str(after.get_outcome()).is_equal(SimulationState.OUTCOME_NONE)
+	assert_array(after.get_event_log()) \
+		.append_failure_message("panel zdarzen nie zostal wyczyszczony") \
+		.is_empty()
+	assert_bool(bool(scene.get("_running"))).is_false()
+
+	var outcome_label := scene.get_node("HudLayer/Hud/OutcomeLabel") as Label
+	assert_str(outcome_label.text) \
+		.append_failure_message("komunikat terminalny poprzedniego wariantu nie zniknal") \
+		.not_contains("WYKRYTY")
+
+
+## Dymny test: restart odtwarza wybrany wariant, nie wraca do domyślnego.
+func test_restart_preserves_selected_variant() -> void:
+	var runner := scene_runner(MAIN_SCENE)
+	await runner.simulate_frames(1)
+	var scene := runner.scene()
+	var hud := scene.get_node("HudLayer/Hud") as Hud
+
+	scene.call("select_variant", VARIANT_SUCCESS)
+	scene.call("single_step")
+	scene.call("single_step")
+	assert_int(_simulation_of(scene).get_tick()).is_equal(2)
+
+	hud.restart_requested.emit()
+
+	var snapshot := _simulation_of(scene).get_state_snapshot()
+	assert_int(int(snapshot["tick"])).is_equal(0)
+	assert_int(int(snapshot["guard_view_range"])) \
+		.append_failure_message("restart zgubil parametry wybranego wariantu") \
+		.is_equal(4)
+	assert_str(String(scene.call("current_variant_name"))) \
+		.append_failure_message("restart przelaczyl wariant") \
+		.is_equal("SUKCES INTRUZA")
+	assert_bool(bool(scene.get("_running"))).is_false()
 
 
 ## Warstwa prezentacji nie może zawierać fizyki: żadnych ciał, obszarów,

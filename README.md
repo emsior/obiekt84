@@ -32,20 +32,33 @@ Z terminala, podstawiając własną ścieżkę do binarki Godota:
 "%GODOT_BIN%" --path .
 ```
 
-Okno startuje w stanie **PAUSED** na ticku 0. Naciśnij **Spację**, żeby uruchomić przebieg, albo **N**, żeby przechodzić tick po ticku.
+Okno startuje w stanie **PAUSED** na ticku 0, w wariancie wykrycia. Naciśnij **Spację**, żeby uruchomić przebieg, albo **N**, żeby przechodzić tick po ticku. Klawisze `1`, `2`, `3` przełączają wariant incydentu.
 
 ### Sterowanie
 
 | Klawisz | Działanie |
 |---|---|
+| `1` / `2` / `3` | wybór wariantu incydentu |
 | Spacja | start / pauza automatycznego przebiegu |
 | `N` | jeden tick symulacji |
-| `R` | restart — świeży scenariusz i świeża symulacja |
+| `R` | restart **aktualnie wybranego** wariantu |
 | `F` | pokaż/ukryj stożki widzenia kamery i strażnika |
 | `L` | pokaż/ukryj panel ostatnich zdarzeń |
 | Escape | pauza (powrót do stanu neutralnego) |
 
-To samo obsługują przyciski **Start**, **Pauza/Wznów** i **Restart** w HUD.
+To samo obsługują przyciski w HUD: trzy przyciski wariantu oraz **Start**, **Pauza/Wznów** i **Restart**.
+
+### Trzy warianty incydentu
+
+Wszystkie trzy zakończenia silnika L0 można obejrzeć bez edytowania kodu. Warianty **nie zmieniają żadnej reguły gry** — to te same dane z `ScenarioL0.create()`, w dwóch przypadkach z jednym zmienionym polem:
+
+| Wariant | Klawisz | Zmiana danych | Wynik |
+|---|---|---|---|
+| Wykrycie | `1` | brak | `INTRUDER_DETECTED`, tick 38 |
+| Sukces intruza | `2` | `guard_view_range = 4` | `INTRUDER_SUCCESS`, tick 40 |
+| Limit ticków | `3` | `max_ticks = 20` | `TICK_LIMIT`, tick 20 |
+
+Wybór wariantu natychmiast restartuje przebieg: świeże dane, świeża `Simulation`, tick 0, pusty panel zdarzeń, stan `PAUSED`. Aktywny wariant jest oznaczony wypełnionym znacznikiem na przycisku i nazwą w HUD. `R` restartuje wybrany wariant, nie wraca do domyślnego.
 
 ### Co widać na ekranie
 
@@ -77,7 +90,7 @@ $env:GODOT_BIN = 'C:\sciezka\do\Godot_v4.7.2-stable_win64_console.exe'
 "%GODOT_BIN%" --headless --path . -s res://addons/gdUnit4/bin/GdUnitCmdTool.gd -a tests --ignoreHeadlessMode
 ```
 
-Wynik ostatniego uruchomienia: **78 przypadków testowych, 0 błędów, 0 failures, 0 flaky, 0 skipped, 0 orphans, exit code 0.**
+Wynik ostatniego uruchomienia: **81 przypadków testowych, 0 błędów, 0 failures, 0 flaky, 0 skipped, 0 orphans, exit code 0.**
 
 Flaga `--ignoreHeadlessMode` jest wymagana, ponieważ GdUnit4 domyślnie odmawia pracy w trybie headless. Nasze testy nie używają `InputEvent`, więc to ograniczenie ich nie dotyczy.
 
@@ -87,7 +100,7 @@ Flaga `--ignoreHeadlessMode` jest wymagana, ponieważ GdUnit4 domyślnie odmawia
 call addons\gdUnit4\runtest.cmd -a tests
 ```
 
-Exit code 0, 78/78 przypadków. Uwaga: `runtest.cmd` uruchamia właściwy przebieg **w trybie okienkowym**, nie headless, i w tym repozytorium działa poprawnie wyłącznie wywołany z CMD lub PowerShell. Wywołany przez Git Bash zawiesza się bez wypisania czegokolwiek. Do CI używaj komendy podstawowej.
+Exit code 0, 81/81 przypadków. Uwaga: `runtest.cmd` uruchamia właściwy przebieg **w trybie okienkowym**, nie headless, i w tym repozytorium działa poprawnie wyłącznie wywołany z CMD lub PowerShell. Wywołany przez Git Bash zawiesza się bez wypisania czegokolwiek. Do CI używaj komendy podstawowej.
 
 Raporty XML i HTML lądują w `reports/` (katalog ignorowany przez Git).
 

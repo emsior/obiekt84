@@ -1,27 +1,49 @@
-## Koordynator sceny L0: adapter czasu, obsługa wejścia i odświeżanie widoku.
+## Koordynator sceny L0: wybór wariantu incydentu, adapter czasu, obsługa
+## wejścia i odświeżanie widoku.
 ##
 ## Timer jest wyłącznie tempem wizualnym — nie jest zegarem domenowym.
 ## Każdy timeout wywołuje najwyżej jeden jawny step(). Jitter Timera nie może
 ## zmienić wyniku logicznego, bo rdzeń nie widzi delty ani czasu rzeczywistego.
 ##
-## Ten node czyta input i steruje prezentacją. Nie zna reguł gry: wszystkie
-## decyzje o wyniku, ruchu i wykryciu podejmuje rdzeń.
+## Warianty incydentu to wyłącznie **różne dane wejściowe** tego samego silnika
+## L0 — nie zmieniają żadnej reguły gry. Każdy startuje od świeżych danych
+## `ScenarioL0.create()`; dwa z nich zmieniają dokładnie jedno pole.
+## Konfiguracja żyje tutaj, bo potrzebuje jej wyłącznie warstwa prezentacji.
 extends Node2D
+
+enum ScenarioVariant {
+	DETECTION,
+	SUCCESS,
+	TICK_LIMIT,
+}
+
+## Zasięg widzenia strażnika w wariancie sukcesu. Przy tej wartości strażnik
+## dostrzega intruza na jeden tick, gubi cel, wraca do patrolu, a intruz kończy
+## trasę. Wynik powstaje normalną pracą silnika.
+const SUCCESS_GUARD_VIEW_RANGE := 4
+
+## Limit ticków w wariancie limitu. Wykrycie wypada w 38 ticku, więc przebieg
+## urywa się naturalnie, zanim którykolwiek aktor osiągnie stan terminalny.
+const TICK_LIMIT_MAX_TICKS := 20
+
+const VARIANT_NAMES := {
+	ScenarioVariant.DETECTION: "WYKRYCIE",
+	ScenarioVariant.SUCCESS: "SUKCES INTRUZA",
+	ScenarioVariant.TICK_LIMIT: "LIMIT TICKÓW",
+}
 
 @onready var _level_view: LevelView = $LevelL0
 @onready var _hud: Hud = $HudLayer/Hud
 @onready var _step_timer: Timer = $StepTimer
 
 var _simulation: Simulation = null
+var _variant: ScenarioVariant = ScenarioVariant.DETECTION
 var _running := false
 var _overlay_visible := true
 var _log_visible := true
 
 
 func _ready() -> void:
-	_simulation = Simulation.new()
-	_simulation.initialize(ScenarioL0.create())
-
 	_step_timer.wait_time = Simulation.SECONDS_PER_TICK
 	_step_timer.one_shot = false
 	_step_timer.timeout.connect(_on_step_timeout)
@@ -29,9 +51,10 @@ func _ready() -> void:
 	_hud.start_requested.connect(_on_start_requested)
 	_hud.pause_toggle_requested.connect(_on_pause_toggle_requested)
 	_hud.restart_requested.connect(_on_restart_requested)
+	_hud.variant_requested.connect(select_variant)
 
 	_level_view.set_overlay_visible(_overlay_visible)
-	_render()
+	_rebuild_simulation()
 
 
 ## Sterowanie klawiaturą. Wejście należy wyłącznie do warstwy prezentacji —
@@ -42,6 +65,12 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	var key_event := event as InputEventKey
 	match key_event.keycode:
+		KEY_1:
+			select_variant(ScenarioVariant.DETECTION)
+		KEY_2:
+			select_variant(ScenarioVariant.SUCCESS)
+		KEY_3:
+			select_variant(ScenarioVariant.TICK_LIMIT)
 		KEY_SPACE:
 			_on_pause_toggle_requested()
 		KEY_N:
@@ -58,6 +87,47 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 	get_viewport().set_input_as_handled()
 
+
+# === warianty incydentu =======================================================
+
+## Wybór wariantu natychmiast restartuje przebieg na świeżych danych.
+## Poprzednia instancja Simulation jest porzucana, nie wznawiana.
+func select_variant(variant: ScenarioVariant) -> void:
+	_variant = variant
+	_rebuild_simulation()
+
+
+func current_variant() -> ScenarioVariant:
+	return _variant
+
+
+func current_variant_name() -> String:
+	return String(VARIANT_NAMES[_variant])
+
+
+## Świeże dane wejściowe dla aktualnego wariantu. Zawsze zaczynamy od
+## ScenarioL0.create(); warianty zmieniają najwyżej jedno pole.
+func _build_scenario() -> ScenarioL0:
+	var scenario := ScenarioL0.create()
+	match _variant:
+		ScenarioVariant.SUCCESS:
+			scenario.guard_view_range = SUCCESS_GUARD_VIEW_RANGE
+		ScenarioVariant.TICK_LIMIT:
+			scenario.max_ticks = TICK_LIMIT_MAX_TICKS
+		_:
+			pass
+	return scenario
+
+
+## Świeża symulacja na świeżych danych plus czysty stan prezentacji.
+func _rebuild_simulation() -> void:
+	_stop()
+	_simulation = Simulation.new()
+	_simulation.initialize(_build_scenario())
+	_render()
+
+
+# === sterowanie przebiegiem ===================================================
 
 ## Jeden timeout to dokładnie jedno wywołanie step().
 func _on_step_timeout() -> void:
@@ -108,16 +178,9 @@ func pause() -> void:
 	_render()
 
 
-## Restart przywraca rdzeń do identycznego stanu początkowego na świeżym
-## scenariuszu i czyści stan prezentacji.
+## Restart odtwarza **aktualnie wybrany** wariant, nie wraca do domyślnego.
 func _on_restart_requested() -> void:
-	_stop()
-	_simulation = Simulation.new()
-	_simulation.initialize(ScenarioL0.create())
-	_overlay_visible = true
-	_log_visible = true
-	_level_view.set_overlay_visible(_overlay_visible)
-	_render()
+	_rebuild_simulation()
 
 
 func toggle_overlay() -> void:
@@ -146,4 +209,6 @@ func _render() -> void:
 		_running,
 		_simulation.is_finished(),
 		_overlay_visible,
-		_log_visible)
+		_log_visible,
+		int(_variant),
+		current_variant_name())

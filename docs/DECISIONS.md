@@ -187,3 +187,13 @@ Format wpisu: data, decyzja, uzasadnienie, konsekwencje.
 **Decyzja 3 — viewport 1280 × 800.** Domyślne 1152 × 648 nie mieści planszy 560 px razem z HUD, legendą sterowania i panelem dwunastu zdarzeń. Zmieniono wyłącznie `window/size/viewport_*` w `[display]`; renderer, `config/features` i ustawienia fizyki pozostały nietknięte.
 
 **Konsekwencje:** granica core/presentation nie przesunęła się — rdzeń nadal nie zna sceny, nie czyta inputu i nie widzi delty. Wejście z klawiatury obsługuje wyłącznie `simulation_runner.gd` przez `_unhandled_input`. Widok nie ma własnej implementacji FOV: stożki rysuje tą samą funkcją `FovCalculator`, której używa rdzeń, wyłącznie w celach ilustracyjnych.
+
+---
+
+## 2026-09-21 — Warianty incydentu jako dane wejściowe w warstwie prezentacji
+
+**Decyzja:** trzy warianty L0 (wykrycie, sukces intruza, limit ticków) są wybieralne z UI. Ich konfiguracja — `guard_view_range = 4` i `max_ticks = 20` na świeżych danych z `ScenarioL0.create()` — żyje w `scripts/presentation/simulation_runner.gd`. **Nie dodano `ScenarioL0.create_success_variant()` ani żadnego innego publicznego API w rdzeniu.**
+
+**Uzasadnienie:** wariant to zestaw danych wejściowych, nie mechanika. Rdzeń nie potrzebuje wiedzieć, że ktoś chce obejrzeć inne zakończenie — `Simulation` przyjmuje dowolny `ScenarioL0` i pracuje tymi samymi regułami. Konfiguracja dwóch pól powtarza się między testami a koordynatorem, ale to powtórzenie **danych**, nie logiki gry; wyciąganie jej do rdzenia rozszerzyłoby publiczne API o coś potrzebne wyłącznie prezentacji i testom.
+
+**Konsekwencje:** wszystkie trzy zakończenia da się zobaczyć bez edytowania kodu, a rdzeń pozostaje nietknięty — ta tura nie zmieniła ani jednej linii w `scripts/core/` i `scripts/actors/`. Gdyby warianty kiedyś stały się częścią rozgrywki (wybór misji), trzeba będzie je przenieść do danych domenowych i odnotować to tutaj.

@@ -90,12 +90,23 @@ Do przejścia przed każdą sesją playtestu. Uruchom `F5` w edytorze albo `"%GO
 - [ ] Status zmienia się na `FINISHED`, automatyczny przebieg zatrzymuje się sam.
 - [ ] Dalsze naciskanie **N** i **Spacji** nic nie zmienia.
 
-## Sukces intruza i limit ticków
+## Trzy warianty incydentu
 
-Oba warianty wymagają zmiany danych scenariusza w `scripts/core/scenario_l0.gd` — w tej iteracji nie ma UI planowania.
+Wybierane klawiszami `1` / `2` / `3` albo przyciskami w HUD. Żadnej edycji kodu.
 
-- [ ] `guard_view_range = 4`: intruz dochodzi do celu, komunikat **zielony** `INTRUZ DOTARŁ DO CELU — tick 40`.
-- [ ] `max_ticks = 20`: przebieg urywa się, komunikat **pomarańczowy** `LIMIT TICKÓW WYCZERPANY — tick 20`.
+- [ ] `1` — **Wykrycie**: HUD pokazuje `SCENARIUSZ: WYKRYCIE`, tick `0 / 400`. Po uruchomieniu Spacją przebieg kończy się **czerwonym** `INTRUZ WYKRYTY — tick 38`.
+- [ ] `2` — **Sukces**: HUD pokazuje `SCENARIUSZ: SUKCES INTRUZA`, tick `0 / 400`, zasięg strażnika `4`. Przebieg kończy się **zielonym** `INTRUZ DOTARŁ DO CELU — tick 40`. W panelu zdarzeń widać pełny cykl `SUSPICION` → `RETURN` → `PATROL`.
+- [ ] `3` — **Limit ticków**: HUD pokazuje `SCENARIUSZ: LIMIT TICKÓW`, tick `0 / 20`. Przebieg kończy się **pomarańczowym** `LIMIT TICKÓW WYCZERPANY — tick 20`. W logu **nie ma** zdarzeń `DETECTED` ani `SUCCESS`.
+
+## Przełączanie wariantów
+
+- [ ] Aktywny wariant ma wypełniony znacznik `●` na przycisku, pozostałe `○`.
+- [ ] Zmiana wariantu w trakcie automatycznego przebiegu zatrzymuje go i restartuje.
+- [ ] Po zmianie wariantu komunikat końcowy poprzedniego przebiegu **natychmiast znika** i wraca `incydent w toku`.
+- [ ] Po zmianie wariantu panel zdarzeń jest pusty, tick `0`, status `PAUSED`.
+- [ ] Limit ticków w HUD odpowiada wybranemu wariantowi (`400` albo `20`).
+- [ ] **R** restartuje **ten sam** wariant, nie wraca do wykrycia.
+- [ ] Przyciski robią dokładnie to samo co klawisze.
 
 ## Restart
 

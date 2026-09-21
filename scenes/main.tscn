@@ -27,46 +27,73 @@ script = ExtResource("3_hud")
 
 [node name="OutcomeLabel" type="Label" parent="HudLayer/Hud"]
 offset_left = 620.0
-offset_top = 16.0
+offset_top = 14.0
 offset_right = 1260.0
-offset_bottom = 52.0
+offset_bottom = 46.0
 text = "incydent w toku"
+
+[node name="ScenarioLabel" type="Label" parent="HudLayer/Hud"]
+offset_left = 620.0
+offset_top = 54.0
+offset_right = 1260.0
+offset_bottom = 74.0
+
+[node name="DetectionButton" type="Button" parent="HudLayer/Hud"]
+offset_left = 620.0
+offset_top = 78.0
+offset_right = 800.0
+offset_bottom = 110.0
+text = "Wykrycie [1]"
+
+[node name="SuccessButton" type="Button" parent="HudLayer/Hud"]
+offset_left = 810.0
+offset_top = 78.0
+offset_right = 990.0
+offset_bottom = 110.0
+text = "Sukces [2]"
+
+[node name="TickLimitButton" type="Button" parent="HudLayer/Hud"]
+offset_left = 1000.0
+offset_top = 78.0
+offset_right = 1200.0
+offset_bottom = 110.0
+text = "Limit ticków [3]"
 
 [node name="StartButton" type="Button" parent="HudLayer/Hud"]
 offset_left = 620.0
-offset_top = 62.0
+offset_top = 118.0
 offset_right = 712.0
-offset_bottom = 96.0
+offset_bottom = 150.0
 text = "Start"
 
 [node name="PauseButton" type="Button" parent="HudLayer/Hud"]
-offset_left = 724.0
-offset_top = 62.0
-offset_right = 828.0
-offset_bottom = 96.0
+offset_left = 722.0
+offset_top = 118.0
+offset_right = 826.0
+offset_bottom = 150.0
 text = "Pauza"
 
 [node name="RestartButton" type="Button" parent="HudLayer/Hud"]
-offset_left = 840.0
-offset_top = 62.0
-offset_right = 944.0
-offset_bottom = 96.0
+offset_left = 836.0
+offset_top = 118.0
+offset_right = 940.0
+offset_bottom = 150.0
 text = "Restart"
 
 [node name="StatusLabel" type="Label" parent="HudLayer/Hud"]
 offset_left = 620.0
-offset_top = 108.0
+offset_top = 158.0
 offset_right = 1260.0
-offset_bottom = 340.0
+offset_bottom = 380.0
 
 [node name="LegendLabel" type="Label" parent="HudLayer/Hud"]
 offset_left = 620.0
-offset_top = 350.0
+offset_top = 386.0
 offset_right = 1260.0
-offset_bottom = 490.0
+offset_bottom = 520.0
 
 [node name="LogLabel" type="Label" parent="HudLayer/Hud"]
 offset_left = 620.0
-offset_top = 500.0
+offset_top = 526.0
 offset_right = 1260.0
-offset_bottom = 784.0
+offset_bottom = 790.0
