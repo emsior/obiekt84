@@ -42,7 +42,11 @@ func test_main_scene_instantiates_with_initial_state() -> void:
 
 	var status := scene.get_node("HudLayer/Hud/StatusLabel") as Label
 	assert_str(status.text).contains("tick:")
-	assert_str(status.text).contains(SimulationState.OUTCOME_NONE)
+	assert_str(status.text).contains(Hud.STATUS_PAUSED)
+
+	# Wynik terminalny ma wlasna etykiete, nie panel statusu.
+	var outcome := scene.get_node("HudLayer/Hud/OutcomeLabel") as Label
+	assert_str(outcome.text).is_not_empty()
 
 
 func test_start_pause_resume_restart_controls() -> void:
@@ -76,10 +80,14 @@ func test_start_pause_resume_restart_controls() -> void:
 	_fire_ticks(scene, 2)
 	assert_int(simulation.get_tick()).is_equal(5)
 
+	# Restart podstawia swieza instancje Simulation na swiezym scenariuszu,
+	# wiec stan trzeba odczytac ponownie ze sceny.
 	hud.restart_requested.emit()
+	var after_restart := _simulation_of(scene)
 	assert_bool(bool(scene.get("_running"))).is_false()
-	assert_int(simulation.get_tick()).is_equal(0)
-	assert_array(simulation.get_event_log()).is_empty()
+	assert_int(after_restart.get_tick()).is_equal(0)
+	assert_array(after_restart.get_event_log()).is_empty()
+	assert_bool(after_restart.is_finished()).is_false()
 
 
 ## 20 cykli Start/Pauza/Restart: stan po każdym resecie musi być identyczny
@@ -89,9 +97,8 @@ func test_twenty_restart_cycles_are_stable() -> void:
 	await runner.simulate_frames(1)
 	var scene := runner.scene()
 	var hud := scene.get_node("HudLayer/Hud") as Hud
-	var simulation := _simulation_of(scene)
 
-	var initial_snapshot := simulation.get_canonical_snapshot()
+	var initial_snapshot := _simulation_of(scene).get_canonical_snapshot()
 	var initial_node_count := _count_nodes(scene)
 
 	for cycle in range(RESTART_CYCLES):
@@ -100,6 +107,8 @@ func test_twenty_restart_cycles_are_stable() -> void:
 		hud.pause_toggle_requested.emit()
 		hud.restart_requested.emit()
 
+		# Po restarcie scena trzyma nowa instancje Simulation.
+		var simulation := _simulation_of(scene)
 		assert_int(simulation.get_tick()) \
 			.append_failure_message("cykl %d: tick po resecie" % cycle) \
 			.is_equal(0)
@@ -114,6 +123,78 @@ func test_twenty_restart_cycles_are_stable() -> void:
 			.is_equal(initial_node_count)
 
 	await runner.simulate_frames(1)
+
+
+## Dymny test: jeden tick musi być widoczny w HUD.
+func test_single_step_updates_hud() -> void:
+	var runner := scene_runner(MAIN_SCENE)
+	await runner.simulate_frames(1)
+	var scene := runner.scene()
+	var status := scene.get_node("HudLayer/Hud/StatusLabel") as Label
+
+	var before := status.text
+	scene.call("single_step")
+
+	assert_int(_simulation_of(scene).get_tick()).is_equal(1)
+	assert_str(status.text) \
+		.append_failure_message("HUD nie odswiezyl sie po ticku") \
+		.is_not_equal(before)
+
+
+## Dymny test: wynik terminalny zatrzymuje automatyczny przebieg.
+func test_terminal_outcome_stops_auto_run() -> void:
+	var runner := scene_runner(MAIN_SCENE)
+	await runner.simulate_frames(1)
+	var scene := runner.scene()
+	var hud := scene.get_node("HudLayer/Hud") as Hud
+
+	hud.start_requested.emit()
+	assert_bool(bool(scene.get("_running"))).is_true()
+
+	# Incydent domyslny konczy sie wykryciem; dajemy zapas timeoutow.
+	_fire_ticks(scene, 60)
+
+	var simulation := _simulation_of(scene)
+	assert_bool(simulation.is_finished()) \
+		.append_failure_message("incydent nie domknal sie") \
+		.is_true()
+	assert_bool(bool(scene.get("_running"))) \
+		.append_failure_message("automatyczny przebieg nie zatrzymal sie po wyniku terminalnym") \
+		.is_false()
+
+	var status := scene.get_node("HudLayer/Hud/StatusLabel") as Label
+	assert_str(status.text).contains(Hud.STATUS_FINISHED)
+
+	var outcome := scene.get_node("HudLayer/Hud/OutcomeLabel") as Label
+	assert_str(outcome.text) \
+		.append_failure_message("komunikat koncowy nie pojawil sie w HUD") \
+		.is_not_empty()
+
+
+## Dymny test: przełączniki prezentacji zmieniają stan widoku, nie rdzenia.
+func test_overlay_and_log_toggles_change_presentation_state() -> void:
+	var runner := scene_runner(MAIN_SCENE)
+	await runner.simulate_frames(1)
+	var scene := runner.scene()
+	var level_view := scene.get_node("LevelL0") as LevelView
+	var log_label := scene.get_node("HudLayer/Hud/LogLabel") as Label
+	var tick_before := _simulation_of(scene).get_tick()
+
+	assert_bool(level_view.is_overlay_visible()).is_true()
+	scene.call("toggle_overlay")
+	assert_bool(level_view.is_overlay_visible()).is_false()
+	scene.call("toggle_overlay")
+	assert_bool(level_view.is_overlay_visible()).is_true()
+
+	assert_bool(log_label.visible).is_true()
+	scene.call("toggle_log")
+	assert_bool(log_label.visible).is_false()
+	scene.call("toggle_log")
+	assert_bool(log_label.visible).is_true()
+
+	assert_int(_simulation_of(scene).get_tick()) \
+		.append_failure_message("przelacznik prezentacji ruszyl symulacje") \
+		.is_equal(tick_before)
 
 
 ## Warstwa prezentacji nie może zawierać fizyki: żadnych ciał, obszarów,

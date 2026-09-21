@@ -175,3 +175,15 @@ Format wpisu: data, decyzja, uzasadnienie, konsekwencje.
 **Uzasadnienie:** priorytet wynika wyłącznie z kolejności gałęzi `if/elif` w `Simulation._resolve_outcome()` (`DETECTED` → `SUCCESS` → `tick >= max_ticks`). Do tej pory była to własność udokumentowana i zmierzona, ale **niepilnowana żadnym testem**. Sprawdzono to eksperymentalnie: po tymczasowym odwróceniu dwóch gałęzi **wszystkie 16 testów golden log przeszło bez zmian**, bo w żadnym z trzech zatwierdzonych przebiegów remis nie występuje. Nowy test tworzy remis jawnie, ustawiając `max_ticks = 38` na świeżych danych — dokładnie w ticku, w którym zapada wykrycie.
 
 **Konsekwencje:** odwrócenie kolejności warunków terminalnych natychmiast zapala ten jeden test, ze wskazaniem błędnego outcome i błędnego powodu wpisu `FINISHED`. Test nie jest czwartym golden fixturem — sprawdza semantyczny kontrakt, a nie pełny przebieg. Zmiana kolejności warunków wymaga świadomej decyzji i wpisu w tym pliku.
+
+---
+
+## 2026-09-21 — Vertical slice L0: dostęp prezentacji do danych i rozmiar okna
+
+**Decyzja 1 — `max_ticks` w snapshocie.** HUD pokazuje `tick / max_ticks`, a limit nie był dostępny poza rdzeniem. Dodano jedno read-only pole do `SimulationState.to_snapshot()`. **Nie ruszono `to_canonical()` ani `canonical_field_names()`**, więc wszystkie trzy golden fixture'y pozostają ważne bez zmian. To jedyna zmiana w `scripts/core/` w tej turze i jest zgodna z zasadą „najpierw dane już dostępne, potem minimalny accessor".
+
+**Decyzja 2 — restart tworzy nową instancję `Simulation`.** Wcześniej Restart wołał `reset()` na tej samej instancji. Vertical slice wymaga świeżego scenariusza i świeżej symulacji, więc `_on_restart_requested()` buduje oba od nowa. To realna zmiana kontraktu sceny: testy integracyjne odczytują teraz `_simulation` ponownie po restarcie, zamiast trzymać starą referencję. `reset()` w rdzeniu pozostaje nietknięty i nadal jest pokryty testami core.
+
+**Decyzja 3 — viewport 1280 × 800.** Domyślne 1152 × 648 nie mieści planszy 560 px razem z HUD, legendą sterowania i panelem dwunastu zdarzeń. Zmieniono wyłącznie `window/size/viewport_*` w `[display]`; renderer, `config/features` i ustawienia fizyki pozostały nietknięte.
+
+**Konsekwencje:** granica core/presentation nie przesunęła się — rdzeń nadal nie zna sceny, nie czyta inputu i nie widzi delty. Wejście z klawiatury obsługuje wyłącznie `simulation_runner.gd` przez `_unhandled_input`. Widok nie ma własnej implementacji FOV: stożki rysuje tą samą funkcją `FovCalculator`, której używa rdzeń, wyłącznie w celach ilustracyjnych.

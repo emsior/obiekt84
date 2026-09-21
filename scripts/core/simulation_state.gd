@@ -58,6 +58,7 @@ func is_finished() -> bool:
 func to_snapshot() -> Dictionary:
 	return {
 		"tick": tick,
+		"max_ticks": max_ticks,
 		"outcome": outcome,
 		"grid_size": grid.size(),
 		"guard_id": guard.id,

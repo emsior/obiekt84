@@ -22,7 +22,7 @@ Plugin jest w repozytorium świadomie — CI i kolejne sesje nie muszą go pobie
 2. **Import** → wskaż `project.godot` w katalogu tego repozytorium.
 3. GdUnit4 jest już zarejestrowany w `project.godot`; zakładka **gdUnitConsole** pojawia się na dolnym panelu edytora.
 
-## Uruchomienie gry
+## Uruchomienie vertical slice L0
 
 W edytorze: **F5** (scena główna to `res://scenes/main.tscn`).
 
@@ -32,7 +32,28 @@ Z terminala, podstawiając własną ścieżkę do binarki Godota:
 "%GODOT_BIN%" --path .
 ```
 
-Sterowanie: **Start**, **Pauza/Wznów**, **Restart**. Restart przywraca dokładnie stan początkowy i zatrzymuje odtwarzanie.
+Okno startuje w stanie **PAUSED** na ticku 0. Naciśnij **Spację**, żeby uruchomić przebieg, albo **N**, żeby przechodzić tick po ticku.
+
+### Sterowanie
+
+| Klawisz | Działanie |
+|---|---|
+| Spacja | start / pauza automatycznego przebiegu |
+| `N` | jeden tick symulacji |
+| `R` | restart — świeży scenariusz i świeża symulacja |
+| `F` | pokaż/ukryj stożki widzenia kamery i strażnika |
+| `L` | pokaż/ukryj panel ostatnich zdarzeń |
+| Escape | pauza (powrót do stanu neutralnego) |
+
+To samo obsługują przyciski **Start**, **Pauza/Wznów** i **Restart** w HUD.
+
+### Co widać na ekranie
+
+Plansza 20 × 20 po lewej: ciemna podłoga, obrys granicy, trasa intruza zaznaczona komórka po komórce (przebyty odcinek ma inny odcień), cztery waypointy patrolu z pogrubionym aktualnym celem, żółty marker celu intruza, kamera i strażnik ze znacznikiem kierunku. Stożki widzenia zmieniają kolor razem ze stanem strażnika: żółty w `PATROL`, jaśniejszy w `SUSPICION`, czerwony w `ALARM`.
+
+HUD po prawej: komunikat końcowy (czerwony — wykrycie, zielony — sukces intruza, pomarańczowy — limit ticków), status `PAUSED` / `RUNNING` / `FINISHED`, tick i limit ticków, stany strażnika i intruza, legenda sterowania oraz panel dwunastu ostatnich zdarzeń w kolejności chronologicznej.
+
+Automatyczny przebieg zatrzymuje się sam po osiągnięciu wyniku terminalnego. Restart tworzy świeży scenariusz i świeżą instancję `Simulation` oraz czyści panel zdarzeń.
 
 ## Testy headless
 
@@ -56,7 +77,7 @@ $env:GODOT_BIN = 'C:\sciezka\do\Godot_v4.7.2-stable_win64_console.exe'
 "%GODOT_BIN%" --headless --path . -s res://addons/gdUnit4/bin/GdUnitCmdTool.gd -a tests --ignoreHeadlessMode
 ```
 
-Wynik ostatniego uruchomienia: **75 przypadków testowych, 0 błędów, 0 failures, 0 flaky, 0 skipped, 0 orphans, exit code 0.**
+Wynik ostatniego uruchomienia: **78 przypadków testowych, 0 błędów, 0 failures, 0 flaky, 0 skipped, 0 orphans, exit code 0.**
 
 Flaga `--ignoreHeadlessMode` jest wymagana, ponieważ GdUnit4 domyślnie odmawia pracy w trybie headless. Nasze testy nie używają `InputEvent`, więc to ograniczenie ich nie dotyczy.
 
@@ -66,7 +87,7 @@ Flaga `--ignoreHeadlessMode` jest wymagana, ponieważ GdUnit4 domyślnie odmawia
 call addons\gdUnit4\runtest.cmd -a tests
 ```
 
-Exit code 0, 75/75 przypadków. Uwaga: `runtest.cmd` uruchamia właściwy przebieg **w trybie okienkowym**, nie headless, i w tym repozytorium działa poprawnie wyłącznie wywołany z CMD lub PowerShell. Wywołany przez Git Bash zawiesza się bez wypisania czegokolwiek. Do CI używaj komendy podstawowej.
+Exit code 0, 78/78 przypadków. Uwaga: `runtest.cmd` uruchamia właściwy przebieg **w trybie okienkowym**, nie headless, i w tym repozytorium działa poprawnie wyłącznie wywołany z CMD lub PowerShell. Wywołany przez Git Bash zawiesza się bez wypisania czegokolwiek. Do CI używaj komendy podstawowej.
 
 Raporty XML i HTML lądują w `reports/` (katalog ignorowany przez Git).
 
@@ -108,7 +129,7 @@ najpierw ustal, czy zmiana zachowania była zamierzona.
 - Jedna statyczna kamera wykrywająca intruza czysto matematycznie.
 - Sztywny tick logiczny 10 Hz, niezależny od FPS i renderowania.
 - Event log o stałym schemacie `tick | subject | event | reason`.
-- UI: Start, Pauza/Wznów, Restart.
+- UI: sterowanie klawiaturą i przyciskami, HUD ze stanem, komunikatem końcowym i panelem zdarzeń.
 - Testy GdUnit4 uruchamiane bez otwierania okna gry.
 
 Bieżący incydent kończy się w 38 ticku wykryciem intruza przez strażnika, trzy komórki przed końcem jego trasy.
