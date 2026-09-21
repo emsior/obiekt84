@@ -293,6 +293,101 @@ func test_restart_preserves_selected_variant() -> void:
 	assert_bool(bool(scene.get("_running"))).is_false()
 
 
+## Dymny test: tempo startuje na 1x i przelicza interwal prezentacji.
+## Sprawdzamy konfiguracje i interwal Timera, nigdy realnego czasu wall-clock.
+func test_playback_speed_defaults_to_normal_and_updates_runner() -> void:
+	var runner := scene_runner(MAIN_SCENE)
+	await runner.simulate_frames(1)
+	var scene := runner.scene()
+	var timer := scene.get_node("StepTimer") as Timer
+
+	assert_float(float(scene.call("playback_speed"))) \
+		.append_failure_message("domyslne tempo nie wynosi 1x") \
+		.is_equal_approx(1.0, 0.0001)
+	assert_float(timer.wait_time).is_equal_approx(0.1, 0.0001)
+
+	scene.call("set_playback_speed", 0.5)
+	assert_float(float(scene.call("playback_speed"))).is_equal_approx(0.5, 0.0001)
+	assert_float(timer.wait_time) \
+		.append_failure_message("tempo 0,5x powinno dac interwal 0,2 s") \
+		.is_equal_approx(0.2, 0.0001)
+
+	scene.call("set_playback_speed", 2.0)
+	assert_float(float(scene.call("playback_speed"))).is_equal_approx(2.0, 0.0001)
+	assert_float(timer.wait_time) \
+		.append_failure_message("tempo 2x powinno dac interwal 0,05 s") \
+		.is_equal_approx(0.05, 0.0001)
+
+	# Krancowe wartosci nie wychodza poza zakres.
+	scene.call("step_speed", 1)
+	assert_float(float(scene.call("playback_speed"))).is_equal_approx(2.0, 0.0001)
+	scene.call("set_playback_speed", 0.5)
+	scene.call("step_speed", -1)
+	assert_float(float(scene.call("playback_speed"))).is_equal_approx(0.5, 0.0001)
+
+
+## Dymny test: zmiana tempa nie rusza ticka, wariantu ani logu.
+func test_playback_speed_preserves_tick_variant_and_event_log() -> void:
+	var runner := scene_runner(MAIN_SCENE)
+	await runner.simulate_frames(1)
+	var scene := runner.scene()
+
+	scene.call("select_variant", VARIANT_SUCCESS)
+	for i in range(8):
+		scene.call("single_step")
+
+	var before := _simulation_of(scene)
+	var tick_before := before.get_tick()
+	var log_before := before.get_canonical_log()
+	assert_int(tick_before).is_equal(8)
+	assert_str(log_before).is_not_empty()
+
+	scene.call("set_playback_speed", 2.0)
+
+	var after := _simulation_of(scene)
+	assert_bool(before == after) \
+		.append_failure_message("zmiana tempa utworzyla nowa instancje Simulation") \
+		.is_true()
+	assert_int(after.get_tick()) \
+		.append_failure_message("zmiana tempa zresetowala tick") \
+		.is_equal(tick_before)
+	assert_str(after.get_canonical_log()) \
+		.append_failure_message("zmiana tempa wyczyscila event log") \
+		.is_equal(log_before)
+	assert_str(String(scene.call("current_variant_name"))) \
+		.append_failure_message("zmiana tempa przelaczyla wariant") \
+		.is_equal("SUKCES INTRUZA")
+
+	# Pojedynczy krok nadal zwieksza tick dokladnie o 1, niezaleznie od tempa.
+	scene.call("single_step")
+	assert_int(_simulation_of(scene).get_tick()).is_equal(tick_before + 1)
+
+
+## Dymny test: restart i zmiana wariantu zachowują wybrane tempo.
+func test_restart_and_variant_selection_preserve_playback_speed() -> void:
+	var runner := scene_runner(MAIN_SCENE)
+	await runner.simulate_frames(1)
+	var scene := runner.scene()
+	var hud := scene.get_node("HudLayer/Hud") as Hud
+	var timer := scene.get_node("StepTimer") as Timer
+
+	scene.call("set_playback_speed", 0.5)
+
+	hud.restart_requested.emit()
+	assert_float(float(scene.call("playback_speed"))) \
+		.append_failure_message("restart zgubil wybrane tempo") \
+		.is_equal_approx(0.5, 0.0001)
+	assert_float(timer.wait_time).is_equal_approx(0.2, 0.0001)
+
+	scene.call("select_variant", VARIANT_TICK_LIMIT)
+	assert_float(float(scene.call("playback_speed"))) \
+		.append_failure_message("zmiana wariantu zgubila wybrane tempo") \
+		.is_equal_approx(0.5, 0.0001)
+	assert_float(timer.wait_time).is_equal_approx(0.2, 0.0001)
+	assert_int(_simulation_of(scene).get_tick()).is_equal(0)
+	assert_bool(bool(scene.get("_running"))).is_false()
+
+
 ## Warstwa prezentacji nie może zawierać fizyki: żadnych ciał, obszarów,
 ## kształtów kolizji, raycastów ani agentów nawigacji.
 func test_presentation_contains_no_physics_nodes() -> void:

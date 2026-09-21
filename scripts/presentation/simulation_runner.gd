@@ -32,26 +32,35 @@ const VARIANT_NAMES := {
 	ScenarioVariant.TICK_LIMIT: "LIMIT TICKÓW",
 }
 
+## Tempo automatycznego przebiegu. To wyłącznie odstęp czasu między kolejnymi
+## wywołaniami step() — zawartość ticka, ich kolejność, FOV, FSM, event log
+## i wynik pozostają bez zmian. Rdzeń nadal nie widzi czasu rzeczywistego.
+const PLAYBACK_SPEEDS: Array[float] = [0.5, 1.0, 2.0]
+const PLAYBACK_SPEED_LABELS: Array[String] = ["Wolno", "Normalnie", "Szybko"]
+const DEFAULT_SPEED_INDEX := 1
+
 @onready var _level_view: LevelView = $LevelL0
 @onready var _hud: Hud = $HudLayer/Hud
 @onready var _step_timer: Timer = $StepTimer
 
 var _simulation: Simulation = null
 var _variant: ScenarioVariant = ScenarioVariant.DETECTION
+var _speed_index := DEFAULT_SPEED_INDEX
 var _running := false
 var _overlay_visible := true
 var _log_visible := true
 
 
 func _ready() -> void:
-	_step_timer.wait_time = Simulation.SECONDS_PER_TICK
 	_step_timer.one_shot = false
 	_step_timer.timeout.connect(_on_step_timeout)
+	_apply_speed()
 
 	_hud.start_requested.connect(_on_start_requested)
 	_hud.pause_toggle_requested.connect(_on_pause_toggle_requested)
 	_hud.restart_requested.connect(_on_restart_requested)
 	_hud.variant_requested.connect(select_variant)
+	_hud.speed_requested.connect(select_speed_index)
 
 	_level_view.set_overlay_visible(_overlay_visible)
 	_rebuild_simulation()
@@ -81,11 +90,66 @@ func _unhandled_input(event: InputEvent) -> void:
 			toggle_overlay()
 		KEY_L:
 			toggle_log()
+		KEY_BRACKETLEFT:
+			step_speed(-1)
+		KEY_BRACKETRIGHT:
+			step_speed(1)
 		KEY_ESCAPE:
 			pause()
 		_:
 			return
 	get_viewport().set_input_as_handled()
+
+
+# === tempo automatycznego przebiegu ===========================================
+
+## Zmiana tempa o jeden stopień: -1 wolniej, +1 szybciej. Na krańcach zostaje
+## przy skrajnej wartości. Nie rusza ticka, logu, wariantu ani stanu auto-run.
+func step_speed(direction: int) -> void:
+	select_speed_index(clampi(_speed_index + direction, 0, PLAYBACK_SPEEDS.size() - 1))
+
+
+func select_speed_index(index: int) -> void:
+	var clamped := clampi(index, 0, PLAYBACK_SPEEDS.size() - 1)
+	if clamped == _speed_index:
+		return
+	_speed_index = clamped
+	_apply_speed()
+	_render()
+
+
+func set_playback_speed(multiplier: float) -> void:
+	var index := PLAYBACK_SPEEDS.find(multiplier)
+	if index < 0:
+		push_warning("Nieznany mnoznik tempa: %s" % str(multiplier))
+		return
+	select_speed_index(index)
+
+
+func playback_speed() -> float:
+	return PLAYBACK_SPEEDS[_speed_index]
+
+
+func playback_speed_index() -> int:
+	return _speed_index
+
+
+func playback_speed_label() -> String:
+	return PLAYBACK_SPEED_LABELS[_speed_index]
+
+
+## Odstęp prezentacji między automatycznymi krokami.
+func step_interval() -> float:
+	return Simulation.SECONDS_PER_TICK / playback_speed()
+
+
+## Przeliczenie interwału Timera. W trakcie odtwarzania restartujemy Timer,
+## żeby nowe tempo obowiązywało już przed kolejnym automatycznym tickiem.
+## `start()` nie emituje timeout, więc przełączenie nie wykonuje dodatkowego kroku.
+func _apply_speed() -> void:
+	_step_timer.wait_time = step_interval()
+	if _running:
+		_step_timer.start()
 
 
 # === warianty incydentu =======================================================
@@ -206,9 +270,14 @@ func _render() -> void:
 	_hud.render(
 		snapshot,
 		_simulation.get_last_events(Hud.LOG_LINES),
-		_running,
-		_simulation.is_finished(),
-		_overlay_visible,
-		_log_visible,
-		int(_variant),
-		current_variant_name())
+		{
+			"running": _running,
+			"finished": _simulation.is_finished(),
+			"overlay_visible": _overlay_visible,
+			"log_visible": _log_visible,
+			"variant_index": int(_variant),
+			"variant_name": current_variant_name(),
+			"speed_index": _speed_index,
+			"speed_multiplier": playback_speed(),
+			"speed_label": playback_speed_label(),
+		})

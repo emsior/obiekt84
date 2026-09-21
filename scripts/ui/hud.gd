@@ -1,9 +1,9 @@
-## HUD L0: wybór wariantu incydentu, stan symulacji, komunikat końcowy,
-## panel zdarzeń i legenda sterowania.
+## HUD L0: wybór wariantu incydentu, tempo podglądu, stan symulacji, komunikat
+## końcowy, panel zdarzeń i legenda sterowania.
 ##
 ## HUD jest pasywny. Nie zna FSM, ticków ani danych scenariusza — wyświetla to,
 ## co dostanie w `render()`, i zgłasza intencję użytkownika sygnałem.
-## Nigdy nie dotyka `Simulation`, `ScenarioL0` ani `SimulationState`
+## Nigdy nie dotyka `Simulation`, `ScenarioL0`, `SimulationState` ani `Timer`
 ## i nigdy nie mutuje event logu (dostaje jego kopię).
 class_name Hud
 extends Control
@@ -13,6 +13,8 @@ signal pause_toggle_requested
 signal restart_requested
 ## Prośba o przełączenie wariantu incydentu. Decyzję podejmuje koordynator.
 signal variant_requested(variant_index: int)
+## Prośba o zmianę tempa podglądu. Zmiany dokonuje koordynator.
+signal speed_requested(speed_index: int)
 
 ## Ile ostatnich zdarzeń pokazuje panel.
 const LOG_LINES := 12
@@ -30,18 +32,17 @@ const COLOR_TICK_LIMIT := Color(0.98, 0.72, 0.25, 1.0)
 const COLOR_NEUTRAL := Color(0.82, 0.84, 0.88, 1.0)
 
 const LEGEND := """Sterowanie
-  1 / 2 / 3   wariant incydentu
-  Spacja      start / pauza
-  N           jeden tick
-  R           restart wariantu
-  F           stożki widzenia
-  L           panel zdarzeń
-  Esc         pauza"""
+  1 / 2 / 3  wariant incydentu        [ / ]  tempo 0,5× / 1× / 2×
+  Spacja  start / pauza      N  jeden tick      R  restart wariantu
+  F  stożki widzenia      L  panel zdarzeń      Esc  pauza"""
 
 @onready var _scenario_label: Label = $ScenarioLabel
 @onready var _detection_button: Button = $DetectionButton
 @onready var _success_button: Button = $SuccessButton
 @onready var _tick_limit_button: Button = $TickLimitButton
+@onready var _slow_button: Button = $SlowButton
+@onready var _normal_button: Button = $NormalButton
+@onready var _fast_button: Button = $FastButton
 @onready var _start_button: Button = $StartButton
 @onready var _pause_button: Button = $PauseButton
 @onready var _restart_button: Button = $RestartButton
@@ -51,7 +52,10 @@ const LEGEND := """Sterowanie
 @onready var _log_label: Label = $LogLabel
 
 var _variant_buttons: Array[Button] = []
-var _variant_titles := ["Wykrycie [1]", "Sukces [2]", "Limit ticków [3]"]
+var _speed_buttons: Array[Button] = []
+
+var _variant_titles: Array[String] = ["Wykrycie [1]", "Sukces [2]", "Limit ticków [3]"]
+var _speed_titles: Array[String] = ["Wolno 0,5×", "Normalnie 1×", "Szybko 2×"]
 
 
 func _ready() -> void:
@@ -61,36 +65,45 @@ func _ready() -> void:
 
 	_variant_buttons = [_detection_button, _success_button, _tick_limit_button]
 	for index in _variant_buttons.size():
-		var captured := index
+		var variant := index
 		_variant_buttons[index].pressed.connect(
-			func() -> void: variant_requested.emit(captured))
+			func() -> void: variant_requested.emit(variant))
+
+	_speed_buttons = [_slow_button, _normal_button, _fast_button]
+	for index in _speed_buttons.size():
+		var speed := index
+		_speed_buttons[index].pressed.connect(
+			func() -> void: speed_requested.emit(speed))
 
 	_scenario_label.text = "Scenariusz — te same reguły L0, inne dane wejściowe"
 	_legend_label.text = LEGEND
 
 
-func render(
-		snapshot: Dictionary,
-		events: Array[Dictionary],
-		running: bool,
-		finished: bool,
-		overlay_visible: bool,
-		log_visible: bool,
-		variant_index: int,
-		variant_name: String) -> void:
+## [param ui_state] zawiera flagi prezentacji: running, finished,
+## overlay_visible, log_visible, variant_index, variant_name, speed_index,
+## speed_multiplier, speed_label.
+func render(snapshot: Dictionary, events: Array[Dictionary], ui_state: Dictionary) -> void:
+	var running := bool(ui_state["running"])
+	var finished := bool(ui_state["finished"])
+	var log_visible := bool(ui_state["log_visible"])
 	var status := STATUS_FINISHED if finished else (STATUS_RUNNING if running else STATUS_PAUSED)
 
-	_render_variant_buttons(variant_index)
+	_render_marked_buttons(_variant_buttons, _variant_titles, int(ui_state["variant_index"]))
+	_render_marked_buttons(_speed_buttons, _speed_titles, int(ui_state["speed_index"]))
 
 	_start_button.disabled = running or finished
 	_pause_button.disabled = finished
 	_pause_button.text = "Pauza" if running else "Wznów"
 
 	_status_label.text = "\n".join(PackedStringArray([
-		"SCENARIUSZ: %s" % variant_name,
+		"SCENARIUSZ: %s" % String(ui_state["variant_name"]),
 		"",
 		"status:    %s" % status,
 		"tick:      %d / %d   (10 Hz)" % [int(snapshot["tick"]), int(snapshot["max_ticks"])],
+		"tempo:     %s   [%s]" % [
+			_speed_text(float(ui_state["speed_multiplier"])),
+			String(ui_state["speed_label"]),
+		],
 		"",
 		"strażnik:  %-9s %s  wp=%d  widzi=%d  zasięg=%d" % [
 			String(snapshot["guard_state"]),
@@ -112,7 +125,7 @@ func render(
 		],
 		"",
 		"stożki: %s     panel zdarzeń: %s" % [
-			"widoczne" if overlay_visible else "ukryte",
+			"widoczne" if bool(ui_state["overlay_visible"]) else "ukryte",
 			"widoczny" if log_visible else "ukryty",
 		],
 	]))
@@ -121,11 +134,11 @@ func render(
 	_render_log(events, log_visible)
 
 
-## Aktywny wariant jest oznaczony wypełnionym znacznikiem.
-func _render_variant_buttons(variant_index: int) -> void:
-	for index in _variant_buttons.size():
-		var marker := MARKER_ACTIVE if index == variant_index else MARKER_INACTIVE
-		_variant_buttons[index].text = marker + _variant_titles[index]
+## Aktywna pozycja w grupie jest oznaczona wypełnionym znacznikiem.
+func _render_marked_buttons(buttons: Array[Button], titles: Array[String], active: int) -> void:
+	for index in buttons.size():
+		var marker := MARKER_ACTIVE if index == active else MARKER_INACTIVE
+		buttons[index].text = marker + titles[index]
 
 
 ## Komunikat końcowy: czerwony dla wykrycia, zielony dla sukcesu,
@@ -167,6 +180,15 @@ func _render_log(events: Array[Dictionary], log_visible: bool) -> void:
 			String(entry["reason"]),
 		])
 	_log_label.text = "\n".join(lines)
+
+
+## "0,5×" zamiast "0.5x" — spójnie z językiem interfejsu.
+func _speed_text(multiplier: float) -> String:
+	if is_equal_approx(multiplier, 0.5):
+		return "0,5×"
+	if is_equal_approx(multiplier, 2.0):
+		return "2×"
+	return "1×"
 
 
 func _cell_text(cell: Vector2i) -> String:

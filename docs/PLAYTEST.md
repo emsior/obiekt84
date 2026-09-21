@@ -115,3 +115,27 @@ Wybierane klawiszami `1` / `2` / `3` albo przyciskami w HUD. Żadnej edycji kodu
 - [ ] Aktorzy wracają na pozycje startowe.
 - [ ] Reset jest natychmiastowy — poniżej 20 sekund z perspektywy testera.
 - [ ] Dwudziesty restart wygląda identycznie jak pierwszy.
+
+## Tempo podglądu
+
+Tempo zmienia wyłącznie odstęp między krokami. Wynik przebiegu musi być identyczny w każdym tempie.
+
+- [ ] Po starcie HUD pokazuje `tempo: 1×   [Normalnie]`, aktywny przycisk `● Normalnie 1×`.
+- [ ] `[` przełącza na `0,5×  [Wolno]`, `]` na `2×  [Szybko]`; marker `●` wędruje za wyborem.
+- [ ] `[` przy 0,5× zostaje na 0,5×; `]` przy 2× zostaje na 2×.
+- [ ] Przyciski tempa działają identycznie jak klawisze.
+
+Dla **każdego** z trzech wariantów (`1`, `2`, `3`):
+
+- [ ] Przy 0,5× da się zobaczyć przejście `SUSPICION → ALARM` — w wariancie wykrycia zmianę koloru strażnika i stożka między tickiem 37 a 38.
+- [ ] W wariancie sukcesu przy 0,5× widać pełny cykl `SUSPICION` → `RETURN` → `PATROL` (ticki 38–40).
+- [ ] Przy 2× przebieg wyraźnie przyspiesza, ale kończy się tym samym wynikiem i tym samym logiem.
+- [ ] `N` wykonuje dokładnie jeden tick niezależnie od ustawionego tempa.
+
+Zachowanie tempa:
+
+- [ ] Zmiana tempa w trakcie przebiegu **nie** resetuje ticka ani nie czyści panelu zdarzeń.
+- [ ] Zmiana tempa w trakcie przebiegu nie wykonuje dodatkowego ticka w chwili przełączenia.
+- [ ] Po `R` wybrane tempo zostaje bez zmian.
+- [ ] Po przełączeniu wariantu `1` / `2` / `3` wybrane tempo zostaje bez zmian.
+- [ ] Po wyniku terminalnym zmiana tempa **nie** wznawia przebiegu — status zostaje `FINISHED`.

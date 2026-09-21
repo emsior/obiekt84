@@ -39,6 +39,7 @@ Okno startuje w stanie **PAUSED** na ticku 0, w wariancie wykrycia. Naciśnij **
 | Klawisz | Działanie |
 |---|---|
 | `1` / `2` / `3` | wybór wariantu incydentu |
+| `[` / `]` | tempo podglądu: wolniej / szybciej |
 | Spacja | start / pauza automatycznego przebiegu |
 | `N` | jeden tick symulacji |
 | `R` | restart **aktualnie wybranego** wariantu |
@@ -46,7 +47,21 @@ Okno startuje w stanie **PAUSED** na ticku 0, w wariancie wykrycia. Naciśnij **
 | `L` | pokaż/ukryj panel ostatnich zdarzeń |
 | Escape | pauza (powrót do stanu neutralnego) |
 
-To samo obsługują przyciski w HUD: trzy przyciski wariantu oraz **Start**, **Pauza/Wznów** i **Restart**.
+### Tempo podglądu
+
+| Tryb | Mnożnik | Odstęp między krokami | Efektywnie |
+|---|---|---|---|
+| Wolno | 0,5× | 0,2 s | 5 ticków/s |
+| Normalnie (domyślne) | 1× | 0,1 s | 10 ticków/s |
+| Szybko | 2× | 0,05 s | 20 ticków/s |
+
+Tempo zmienia **wyłącznie odstęp czasu** między kolejnymi wywołaniami `Simulation.step()`. Zawartość ticka, ich kolejność, FOV, FSM, event log i wynik pozostają identyczne — przebieg przy 0,5× i 2× daje bit w bit ten sam kanoniczny log. Rdzeń nadal nie widzi czasu rzeczywistego.
+
+`N` zawsze wykonuje dokładnie jeden tick, niezależnie od tempa. Tempo przeżywa restart (`R`) i zmianę wariantu (`1`/`2`/`3`), a po wyniku terminalnym jego zmiana nie wznawia przebiegu.
+
+Wolne tempo jest po to, żeby dało się zobaczyć moment, w którym strażnik podejmuje decyzję: przejście `SUSPICION → ALARM` trwa przy 1× jedną dziesiątą sekundy.
+
+To samo obsługują przyciski w HUD: trzy przyciski wariantu, trzy przyciski tempa oraz **Start**, **Pauza/Wznów** i **Restart**.
 
 ### Trzy warianty incydentu
 
@@ -90,7 +105,7 @@ $env:GODOT_BIN = 'C:\sciezka\do\Godot_v4.7.2-stable_win64_console.exe'
 "%GODOT_BIN%" --headless --path . -s res://addons/gdUnit4/bin/GdUnitCmdTool.gd -a tests --ignoreHeadlessMode
 ```
 
-Wynik ostatniego uruchomienia: **81 przypadków testowych, 0 błędów, 0 failures, 0 flaky, 0 skipped, 0 orphans, exit code 0.**
+Wynik ostatniego uruchomienia: **84 przypadki testowe, 0 błędów, 0 failures, 0 flaky, 0 skipped, 0 orphans, exit code 0.**
 
 Flaga `--ignoreHeadlessMode` jest wymagana, ponieważ GdUnit4 domyślnie odmawia pracy w trybie headless. Nasze testy nie używają `InputEvent`, więc to ograniczenie ich nie dotyczy.
 
@@ -100,7 +115,7 @@ Flaga `--ignoreHeadlessMode` jest wymagana, ponieważ GdUnit4 domyślnie odmawia
 call addons\gdUnit4\runtest.cmd -a tests
 ```
 
-Exit code 0, 81/81 przypadków. Uwaga: `runtest.cmd` uruchamia właściwy przebieg **w trybie okienkowym**, nie headless, i w tym repozytorium działa poprawnie wyłącznie wywołany z CMD lub PowerShell. Wywołany przez Git Bash zawiesza się bez wypisania czegokolwiek. Do CI używaj komendy podstawowej.
+Exit code 0, 84/84 przypadków. Uwaga: `runtest.cmd` uruchamia właściwy przebieg **w trybie okienkowym**, nie headless, i w tym repozytorium działa poprawnie wyłącznie wywołany z CMD lub PowerShell. Wywołany przez Git Bash zawiesza się bez wypisania czegokolwiek. Do CI używaj komendy podstawowej.
 
 Raporty XML i HTML lądują w `reports/` (katalog ignorowany przez Git).
 
