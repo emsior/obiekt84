@@ -59,6 +59,30 @@ Pierwsza rzecz, o którą zapytał: ________________________________________
 
 ---
 
+# First window pass — 12 punktów
+
+Pierwsze uruchomienie okna. Zajmuje kilka minut. Pełna checklista niżej jest do
+sesji playtestowej, nie do pierwszego kontaktu.
+
+Uruchom `F5` w edytorze albo `"%GODOT_BIN%" --path .`
+
+- [ ] 1. Okno otwiera się bez błędów w konsoli; plansza po lewej, HUD po prawej.
+- [ ] 2. Nagłówek `incydent w toku` jest największym tekstem w słupku HUD, podtytuł wyraźnie mniejszy.
+- [ ] 3. Panel statusu, legenda i event log mają czcionkę o stałej szerokości — kolumny się zgadzają.
+- [ ] 4. Nic nie jest ucięte przy prawej krawędzi ani nie nachodzi na siebie.
+- [ ] 5. **Spacja** uruchamia przebieg; licznik ticków rośnie, aktorzy się przesuwają.
+- [ ] 6. Przebieg zatrzymuje się sam, nagłówek robi się **czerwony**: `INTRUZ WYKRYTY — tick 38`.
+- [ ] 7. W ticku 38 na planszy widać **dwa białe obrysy**, a w logu trzy wiersze z `►`.
+- [ ] 8. Na osi czasu pod planszą widać pomarańczową kreskę (37) i czerwoną (38).
+- [ ] 9. `2` przełącza na wariant sukcesu — nagłówek **zielony**, `3` na limit — **pomarańczowy**.
+- [ ] 10. `,` cofa o tick i zdejmuje stan końcowy; `.` doprowadza z powrotem do tego samego wyniku.
+- [ ] 11. Kliknięcie w pasek osi czasu przewija przebieg.
+- [ ] 12. **Ocena subiektywna:** czy pierwszy rzut oka na ekran nie przytłacza? Czy wiadomo, co nacisnąć?
+
+Jeśli 1–11 przechodzą, a 12 budzi wątpliwości — to materiał na poprawki czytelności, nie na błąd.
+
+---
+
 # Checklista manualna vertical slice L0
 
 Do przejścia przed każdą sesją playtestu. Uruchom `F5` w edytorze albo `"%GODOT_BIN%" --path .`.

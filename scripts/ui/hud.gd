@@ -28,6 +28,13 @@ const LOG_LINES := 11
 ## i nie wolno go skracać, więc to rozmiar musi ustąpić, nie treść.
 const LOG_FONT_SIZE := 13
 
+## Komunikat końcowy to najważniejszy tekst na ekranie, a podtytuł scenariusza
+## renderował się od niego większą i jaśniejszą czcionką. Rozmiary przywracają
+## hierarchię: nagłówek wyżej, podpis wyraźnie niżej.
+const OUTCOME_FONT_SIZE := 22
+const SCENARIO_FONT_SIZE := 13
+const COLOR_SUBTITLE := Color(0.55, 0.59, 0.66, 1.0)
+
 const STATUS_RUNNING := "RUNNING"
 const STATUS_PAUSED := "PAUSED"
 const STATUS_FINISHED := "FINISHED"
@@ -169,6 +176,10 @@ func _apply_monospace_font() -> void:
 	for label: Label in [_status_label, _legend_label, _log_label]:
 		label.add_theme_font_override("font", font)
 	_log_label.add_theme_font_size_override("font_size", LOG_FONT_SIZE)
+
+	_outcome_label.add_theme_font_size_override("font_size", OUTCOME_FONT_SIZE)
+	_scenario_label.add_theme_font_size_override("font_size", SCENARIO_FONT_SIZE)
+	_scenario_label.add_theme_color_override("font_color", COLOR_SUBTITLE)
 
 
 ## Aktywna pozycja w grupie jest oznaczona wypełnionym znacznikiem.

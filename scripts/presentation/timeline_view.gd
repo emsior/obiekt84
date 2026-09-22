@@ -83,11 +83,12 @@ func _draw() -> void:
 
 	_draw_decade_grid()
 
-	# Znaczniki zdarzeń.
+	# Znaczniki zdarzeń. Na pełną wysokość paska i grubsze — przy 2 px i wcięciu
+	# po 3 px z góry i z dołu gubiły się na wypełnionym tle przebytej części.
 	for tick: int in _event_ticks:
 		var x := _tick_to_x(tick)
 		var color := COLOR_TERMINAL if tick == _terminal_tick else COLOR_MARK
-		draw_line(Vector2(x, 3.0), Vector2(x, HEIGHT - 3.0), color, 2.0)
+		draw_line(Vector2(x, 0.0), Vector2(x, HEIGHT), color, 3.0)
 
 	# Kursor bieżącego ticka.
 	draw_line(Vector2(cursor_x, 0.0), Vector2(cursor_x, HEIGHT), COLOR_CURSOR, 2.0)
