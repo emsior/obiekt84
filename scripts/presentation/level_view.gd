@@ -22,7 +22,9 @@ const COLOR_ROUTE_DONE := Color(0.24, 0.38, 0.30, 1.0)
 const COLOR_WAYPOINT := Color(0.58, 0.52, 0.24, 1.0)
 const COLOR_GOAL := Color(0.95, 0.90, 0.40, 1.0)
 const COLOR_HIGHLIGHT := Color(1.0, 1.0, 1.0, 0.92)
-const COLOR_CAMERA_CONE := Color(0.25, 0.55, 0.70, 0.22)
+## Turkus, nie niebieski: trasa intruza jest niebieska i przy tym samym odcieniu
+## stożek kamery zlewał się z nią wzrokowo.
+const COLOR_CAMERA_CONE := Color(0.18, 0.72, 0.76, 0.20)
 const COLOR_GUARD_CONE := Color(0.80, 0.65, 0.20, 0.18)
 const COLOR_GUARD_CONE_SUSPICION := Color(0.95, 0.70, 0.20, 0.28)
 const COLOR_GUARD_CONE_ALARM := Color(0.85, 0.25, 0.20, 0.34)

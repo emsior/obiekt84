@@ -2,7 +2,9 @@
 
 Gracz projektuje system ochrony tajnego retrofuturystycznego obiektu, uruchamia deterministyczną symulację infiltracji i poprawia zabezpieczenia po analizie wyniku.
 
-Ten repozytorium zawiera **wyłącznie pionowy wycinek L0**: jeden ręcznie skonfigurowany incydent, którego logika działa deterministycznie bez UI.
+To repozytorium zawiera **pionowy wycinek L0**: jeden ręcznie skonfigurowany incydent, którego logika działa deterministycznie bez UI, oraz warstwę prezentacji, która pokazuje decyzje silnika człowiekowi.
+
+**Status: L0 domknięty.** Wszystkie kryteria sukcesu z [docs/MVP_L0.md](docs/MVP_L0.md) są spełnione — determinizm potwierdzony testami headless, interfejs obejrzany i oceniony w działającym oknie.
 
 ## Wymagania
 

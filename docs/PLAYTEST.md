@@ -61,6 +61,10 @@ Pierwsza rzecz, o którą zapytał: ________________________________________
 
 # First window pass — 12 punktów
 
+**Wykonany 2026-09-22.** Punkty 1–11 potwierdzone zrzutami z żywego okna
+(D3D12, 1280 × 800), punkt 12 oceną właściciela projektu: nie przytłacza.
+Checklista zostaje do powtórzenia po każdej większej zmianie w prezentacji.
+
 Pierwsze uruchomienie okna. Zajmuje kilka minut. Pełna checklista niżej jest do
 sesji playtestowej, nie do pierwszego kontaktu.
 

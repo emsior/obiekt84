@@ -12,6 +12,12 @@ extends Node2D
 @export var body_color: Color = Color.WHITE
 @export var show_facing: bool = true
 
+## Ciemny pierścień pod podmiotem. Bez niego strażnik w stanie ALARM znikał
+## we własnym czerwonym stożku, bo kolor ciała i kolor stożka są tym samym
+## sygnałem. Pierścień odcina podmiot od dowolnego tła.
+const COLOR_OUTLINE := Color(0.05, 0.06, 0.08, 0.95)
+const OUTLINE_WIDTH := 2.0
+
 var _cell_size: int = 28
 var _facing: Vector2i = Vector2i.RIGHT
 
@@ -33,12 +39,12 @@ func set_body_color(color: Color) -> void:
 
 func _draw() -> void:
 	var radius := float(_cell_size) * 0.34
-	draw_circle(Vector2.ZERO, radius, body_color)
 
 	if show_facing and _facing != Vector2i.ZERO:
 		var direction := Vector2(_facing)
-		draw_line(
-			direction * radius,
-			direction * (radius + float(_cell_size) * 0.42),
-			body_color,
-			2.0)
+		var tip := direction * (radius + float(_cell_size) * 0.42)
+		draw_line(direction * radius, tip, COLOR_OUTLINE, 2.0 + OUTLINE_WIDTH * 2.0)
+		draw_line(direction * radius, tip, body_color, 2.0)
+
+	draw_circle(Vector2.ZERO, radius + OUTLINE_WIDTH, COLOR_OUTLINE)
+	draw_circle(Vector2.ZERO, radius, body_color)

@@ -12,13 +12,13 @@ Konfiguracja samego incydentu jest nadal danymi w kodzie (`scripts/core/scenario
 
 - [x] 50/50 uruchomień headless daje identyczny kanoniczny event log.
 - [x] 50/50 uruchomień daje identyczny końcowy snapshot.
-- [ ] Tester widzi w UI patrol i wynik incydentu. *(wymaga playtestu z człowiekiem)*
-- [ ] Tester potrafi uruchomić, zatrzymać i zresetować poziom. *(wymaga playtestu)*
-- [ ] Reset zajmuje mniej niż 20 sekund z perspektywy testera. *(wymaga playtestu; technicznie jest natychmiastowy)*
+- [x] Tester widzi w UI patrol i wynik incydentu.
+- [x] Tester potrafi uruchomić, zatrzymać i zresetować poziom.
+- [x] Reset zajmuje mniej niż 20 sekund z perspektywy testera.
 - [x] Stan po resecie jest identyczny ze stanem początkowym.
 - [x] Core działa bez uruchamiania sceny.
 
-Pozycje odhaczone są potwierdzone automatycznymi testami headless. Pozycje nieodhaczone wymagają obecności testera i są przedmiotem [PLAYTEST.md](PLAYTEST.md).
+Wszystkie kryteria są odhaczone. Podstawa dla każdego jest podana niżej — część pochodzi z testów headless, część z obejrzenia działającego okna.
 
 ## Porażka L0
 
@@ -45,8 +45,10 @@ Trzy terminalne zakończenia silnika, wszystkie dostępne z UI i wszystkie pokry
 | Sukces intruza | strażnik widzi cel na jeden tick, gubi go i wraca do patrolu | `INTRUDER_SUCCESS`, tick 40 |
 | Limit ticków | przebieg urywa się przed jakimkolwiek wykryciem | `TICK_LIMIT`, tick 20 |
 
-**Czego nadal nie wiemy.** Warstwa prezentacji nie została ani razu zobaczona na ekranie — całość powstała headless.
+**Pierwszy przebieg okienkowy — wykonany.** Projekt uruchomiony w prawdziwym oknie (D3D12, GTX 1080, exit 0). Wszystkie trzy zakończenia obejrzane na zrzutach z żywego rendera: czerwone `INTRUZ WYKRYTY — tick 38`, zielone `INTRUZ DOTARŁ DO CELU — tick 40`, pomarańczowe `LIMIT TICKÓW WYCZERPANY — tick 20`. Potwierdzone wizualnie: układ mieści się bez ucięć i nachodzeń, czcionka o stałej szerokości działa, kolumny event logu się zgadzają, białe wyróżnienie decyzji jest czytelne także na czerwonym stożku `ALARM`, znaczniki osi czasu są widoczne.
 
-Część tego ryzyka jest już zamknięta automatycznie: testy sprawdzają, że każda kontrolka HUD mieści się w viewporcie 1280 × 800, że żadne dwie się nie nakładają, że plansza i oś czasu nie kolidują ze słupkiem HUD i że panele używają czcionki o stałej szerokości. Te testy powstały po tym, jak pomiar prostokątów wykrył cztery realne wady układu, w tym etykietę wychodzącą 71 px poza ekran.
+Ocenę „czy interfejs nie przytłacza" wystawił właściciel projektu po otwarciu okna: **nie przytłacza**.
 
-Niesprawdzone zostaje to, czego geometria nie obejmuje: kontrast i czytelność kolorów, widoczność białego obrysu wyróżnienia na tle jasnego stożka `ALARM`, oraz czy pięć rzędów przycisków nie przytłacza. To ostatnia rzecz dzieląca trzy nieodhaczone kryteria sukcesu od zamknięcia — i wymaga człowieka, nie kolejnego testu.
+**Poprawki czytelności wynikłe z obejrzenia**, nie ze zgadywania: przywrócona hierarchia nagłówka nad podtytułem, znaczniki osi czasu na pełną wysokość, ciemny pierścień odcinający aktorów od tła (strażnik w stanie `ALARM` znikał we własnym czerwonym stożku), turkusowy stożek kamery zamiast niebieskiego (zlewał się z trasą intruza).
+
+**Co pozostaje poza L0:** ściany i pola zablokowane nie istnieją w danych scenariusza, interaktywny edytor planowania jest świadomie odłożony, a konfiguracja incydentu poza trzema wariantami nadal wymaga edycji kodu. To zakres L1, nie brak w L0.
