@@ -35,7 +35,7 @@ Każdy z poniższych punktów oznacza, że L0 nie jest gotowy:
 
 ## Stan bieżący (2026-09-22)
 
-Zestaw testów: **89 przypadków, 0 błędów, 0 failures, 0 flaky, 0 skipped, 0 orphans, exit code 0.**
+Zestaw testów: **92 przypadki, 0 błędów, 0 failures, 0 flaky, 0 skipped, 0 orphans, exit code 0.**
 
 Trzy terminalne zakończenia silnika, wszystkie dostępne z UI i wszystkie pokryte golden fixture'em:
 
@@ -45,4 +45,8 @@ Trzy terminalne zakończenia silnika, wszystkie dostępne z UI i wszystkie pokry
 | Sukces intruza | strażnik widzi cel na jeden tick, gubi go i wraca do patrolu | `INTRUDER_SUCCESS`, tick 40 |
 | Limit ticków | przebieg urywa się przed jakimkolwiek wykryciem | `TICK_LIMIT`, tick 20 |
 
-**Czego nadal nie wiemy:** warstwa prezentacji nie została ani razu zobaczona na ekranie. Całość powstała i była weryfikowana headless, więc czytelność układu, kolorów i wyróżnień pozostaje niesprawdzona. To jedyna rzecz dzieląca trzy nieodhaczone kryteria sukcesu od zamknięcia.
+**Czego nadal nie wiemy.** Warstwa prezentacji nie została ani razu zobaczona na ekranie — całość powstała headless.
+
+Część tego ryzyka jest już zamknięta automatycznie: testy sprawdzają, że każda kontrolka HUD mieści się w viewporcie 1280 × 800, że żadne dwie się nie nakładają, że plansza i oś czasu nie kolidują ze słupkiem HUD i że panele używają czcionki o stałej szerokości. Te testy powstały po tym, jak pomiar prostokątów wykrył cztery realne wady układu, w tym etykietę wychodzącą 71 px poza ekran.
+
+Niesprawdzone zostaje to, czego geometria nie obejmuje: kontrast i czytelność kolorów, widoczność białego obrysu wyróżnienia na tle jasnego stożka `ALARM`, oraz czy pięć rzędów przycisków nie przytłacza. To ostatnia rzecz dzieląca trzy nieodhaczone kryteria sukcesu od zamknięcia — i wymaga człowieka, nie kolejnego testu.

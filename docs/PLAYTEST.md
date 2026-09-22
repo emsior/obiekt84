@@ -187,3 +187,15 @@ Cofanie nie jest mechanizmem undo — to odtworzenie przebiegu od zera do wskaza
 - [ ] `Home` wraca na tick 0, `End` dociąga do wyniku terminalnego.
 - [ ] `End` w wariancie limitu zatrzymuje się na ticku 20, nie na 400.
 - [ ] Przewinięcie zatrzymuje automatyczny przebieg i zachowuje wariant oraz tempo.
+
+## Co jest już sprawdzane automatycznie
+
+Poniższych punktów **nie trzeba** weryfikować okiem — pilnują ich testy w `tests/test_main_scene.gd`:
+
+- każda kontrolka HUD mieści się w viewporcie 1280 × 800;
+- żadne dwie kontrolki HUD nie nachodzą na siebie;
+- plansza i oś czasu nie kolidują ze sobą ani ze słupkiem HUD;
+- panel statusu, legenda i event log używają czcionki o stałej szerokości;
+- kolumny event logu są wyrównane niezależnie od wyróżnienia wiersza.
+
+Playtest ma więc skupić się na tym, czego geometria nie obejmuje: **kontraście, czytelności kolorów i tym, czy interfejs nie przytłacza**.
