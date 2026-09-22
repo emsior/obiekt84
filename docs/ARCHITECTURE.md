@@ -10,12 +10,15 @@ scripts/core/  +  scripts/actors/      scripts/presentation/  +  scripts/ui/
 klasy RefCounted                       node'y Godota
 zero node'ów                           Node2D, Control, Button, Label, Timer
 zero SceneTree                         Timer wywołuje step()
-zero delty i czasu rzeczywistego       czyta snapshot, rysuje
-                     ── snapshot ──▶
-                     ◀── step() / reset() ──
+zero delty i czasu rzeczywistego       czyta snapshot i kopię logu, rysuje
+zero inputu                            czyta klawiaturę i mysz
+        ── snapshot, kopia event logu ──▶
+        ◀── initialize() / step() ──
 ```
 
-Przepływ jest jednokierunkowy. Rdzeń nie wie, że istnieje scena. Prezentacja nie może zapisać niczego do rdzenia — snapshot jest kopią, a jedyne wejścia to `step()` i `reset()`.
+Przepływ jest jednokierunkowy. Rdzeń nie wie, że istnieje scena. Prezentacja nie może zapisać niczego do rdzenia: snapshot i event log są kopiami, a jedyne wejścia zapisujące to `initialize()` i `step()`.
+
+`Simulation.reset()` istnieje w API rdzenia i jest pokryty testami core, ale **prezentacja go nie używa** — restart, zmiana wariantu i przewijanie budują świeżą `Simulation` przez `initialize()`. Powód w sekcji o przewijaniu niżej.
 
 ## Źródło prawdy
 
@@ -101,7 +104,34 @@ Nie opieramy dowodu determinizmu na domyślnej serializacji `Dictionary`. Snapsh
 
 Rdzeń trzyma własną kopię scenariusza, więc reset zawsze odtwarza te same dane wejściowe niezależnie od tego, co stało się z obiektem przekazanym do `initialize()`.
 
-W UI Restart woła `reset()` i zatrzymuje odtwarzanie, żeby tester widział dokładnie stan wyjściowy.
+`reset()` jest używany przez testy rdzenia. **Warstwa prezentacji go nie woła** — Restart, zmiana wariantu i przewijanie budują świeżą `Simulation` przez `initialize()`, bo wariant może wnieść inne dane wejściowe, a `reset()` z definicji wraca do danych, z którymi instancja została zainicjalizowana.
+
+## Warstwa prezentacji
+
+Cztery skrypty, jasno rozdzielone odpowiedzialnościami:
+
+| Plik | Odpowiedzialność |
+|---|---|
+| `scripts/presentation/simulation_runner.gd` | koordynator: właściciel wariantu, tempa, wejścia i cyklu życia `Simulation` |
+| `scripts/presentation/level_view.gd` | rysuje planszę, aktorów, trasę i stożki ze snapshotu |
+| `scripts/presentation/timeline_view.gd` | rysuje oś czasu przebiegu; odwzorowuje piksel na tick |
+| `scripts/ui/hud.gd` | pasywny HUD: wyświetla to, co dostanie, i emituje intencje sygnałami |
+
+Tylko koordynator dotyka `Simulation`. Widoki i HUD dostają gotowe dane i nie decydują o niczym: `level_view` dostaje listę komórek do wyróżnienia, `timeline_view` listę ticków ze zdarzeniami, HUD słownik `ui_state`. HUD nie zna FSM ani reguł — nie interpretuje zdarzeń, tylko oznacza wiersze wskazane przez koordynatora.
+
+**Wejście** (klawiatura i mysz) obsługuje wyłącznie `simulation_runner.gd` w `_unhandled_input`. Rdzeń nigdy nie widzi inputu.
+
+**Warianty incydentu** to wyłącznie różne dane wejściowe: świeże `ScenarioL0.create()` z jednym zmienionym polem (`guard_view_range` albo `max_ticks`). Konfiguracja żyje w koordynatorze, bo potrzebuje jej tylko prezentacja — rdzeń nie dostał API wariantów.
+
+**Tempo podglądu** zmienia wyłącznie `wait_time` Timera. Liczba i kolejność wywołań `step()` są bez zmian, więc przebieg przy 0,5× i 2× daje identyczny kanoniczny log.
+
+## Przewijanie przebiegu
+
+`seek_to_tick(n)` nie cofa stanu i nie trzyma historii snapshotów. Buduje **świeżą** `Simulation` na tych samych danych i wykonuje dokładnie `n` kroków.
+
+Działa to **wyłącznie dzięki determinizmowi rdzenia**: ten sam scenariusz zawsze daje ten sam przebieg, więc odtworzony tick jest identyczny z oryginalnym. To jedyne miejsce w UI, które korzysta z kontraktu determinizmu wprost — i jednocześnie jego praktyczny test: gdyby rdzeń przestał być deterministyczny, przewijanie zaczęłoby pokazywać inny przebieg niż ten, który tester przed chwilą oglądał.
+
+Przewijanie zatrzymuje automatyczny przebieg, zachowuje wariant i tempo, a cofnięcie się przed tick terminalny zdejmuje stan końcowy.
 
 ## Jak działa test deterministyczny
 
