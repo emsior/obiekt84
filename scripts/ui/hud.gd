@@ -29,7 +29,9 @@ const STATUS_FINISHED := "FINISHED"
 const MARKER_ACTIVE := "● "
 const MARKER_INACTIVE := "○ "
 ## Znacznik wpisu, który jest jednocześnie wyróżniony na planszy.
+## Wariant bez wyróżnienia ma tę samą szerokość, żeby kolumny się nie rozjeżdżały.
 const MARKER_EVENT := "►"
+const MARKER_EVENT_NONE := " "
 
 const COLOR_DETECTED := Color(0.95, 0.35, 0.30, 1.0)
 const COLOR_SUCCESS := Color(0.45, 0.88, 0.50, 1.0)
@@ -87,6 +89,7 @@ func _ready() -> void:
 
 	_scenario_label.text = "Scenariusz — te same reguły L0, inne dane wejściowe"
 	_legend_label.text = LEGEND
+	_apply_monospace_font()
 
 
 ## [param ui_state] zawiera flagi prezentacji: running, finished,
@@ -146,6 +149,18 @@ func render(snapshot: Dictionary, events: Array[Dictionary], ui_state: Dictionar
 	_render_log(events, log_visible, ui_state["notable_events"] as Array[Dictionary])
 
 
+## Panel statusu, legenda i event log wyrównują kolumny spacjami, więc wymagają
+## czcionki o stałej szerokości. `SystemFont` bierze rodzinę z systemu — nie jest
+## to zewnętrzny asset i nic nie trafia do repozytorium. Gdy system nie ma żadnej
+## z wymienionych rodzin, Godot cofa się do czcionki domyślnej.
+func _apply_monospace_font() -> void:
+	var font := SystemFont.new()
+	font.font_names = PackedStringArray([
+		"monospace", "Consolas", "DejaVu Sans Mono", "Courier New"])
+	for label: Label in [_status_label, _legend_label, _log_label]:
+		label.add_theme_font_override("font", font)
+
+
 ## Aktywna pozycja w grupie jest oznaczona wypełnionym znacznikiem.
 func _render_marked_buttons(buttons: Array[Button], titles: Array[String], active: int) -> void:
 	for index in buttons.size():
@@ -190,7 +205,7 @@ func _render_log(
 	if events.is_empty():
 		lines.append("  — brak zdarzeń —")
 	for entry: Dictionary in events:
-		var marker := MARKER_EVENT if notable.has(entry) else "  "
+		var marker := MARKER_EVENT if notable.has(entry) else MARKER_EVENT_NONE
 		lines.append("%s %3d  %-12s %-18s %s" % [
 			marker,
 			int(entry["tick"]),
