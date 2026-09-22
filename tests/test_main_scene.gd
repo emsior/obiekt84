@@ -419,6 +419,27 @@ func test_only_decision_ticks_are_highlighted() -> void:
 		.contains([_simulation_of(scene).get_state_snapshot()["guard_position"]])
 
 
+## Dymny test: oś czasu znaczy ticki decyzji i zakończenie przebiegu.
+func test_timeline_marks_decision_ticks_and_terminal_tick() -> void:
+	var runner := scene_runner(MAIN_SCENE)
+	await runner.simulate_frames(1)
+	var scene := runner.scene()
+
+	assert_array(scene.call("timeline_event_ticks")).is_empty()
+	assert_int(int(scene.call("terminal_tick"))) \
+		.append_failure_message("przed startem nie ma ticka terminalnego") \
+		.is_equal(-1)
+
+	for i in range(60):
+		scene.call("single_step")
+
+	assert_bool(_simulation_of(scene).is_finished()).is_true()
+	assert_array(scene.call("timeline_event_ticks")) \
+		.append_failure_message("os czasu powinna znaczyc ticki 37 i 38, bez waypointow") \
+		.is_equal([37, 38])
+	assert_int(int(scene.call("terminal_tick"))).is_equal(38)
+
+
 ## Warstwa prezentacji nie może zawierać fizyki: żadnych ciał, obszarów,
 ## kształtów kolizji, raycastów ani agentów nawigacji.
 func test_presentation_contains_no_physics_nodes() -> void:

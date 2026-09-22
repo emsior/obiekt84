@@ -81,6 +81,8 @@ Plansza 20 × 20 po lewej: ciemna podłoga, obrys granicy, trasa intruza zaznacz
 
 HUD po prawej: komunikat końcowy (czerwony — wykrycie, zielony — sukces intruza, pomarańczowy — limit ticków), status `PAUSED` / `RUNNING` / `FINISHED`, tick i limit ticków, tempo podglądu, stany strażnika i intruza, legenda sterowania oraz panel dwunastu ostatnich zdarzeń w kolejności chronologicznej.
 
+**Oś czasu pod planszą.** Pasek pokazuje, gdzie w przebiegu jesteśmy i kiedy coś się działo: pomarańczowe kreski to ticki decyzji, czerwona to zakończenie, biała to bieżący tick. Oś obejmuje domyślnie pierwsze 40 ticków — incydenty L0 kończą się w okolicach 20–40 ticka, a limit scenariusza wynosi 400, więc rozciąganie osi do limitu ścisnęłoby cały przebieg w lewy margines. Gdy przebieg wyjdzie poza horyzont, ten się podwaja.
+
 **Wyróżnienie decyzji.** Gdy w danym ticku wydarzy się coś innego niż rutynowe minięcie waypointu — przejście FSM strażnika, wykrycie przez kamerę, `DETECTED`, `SUCCESS` albo zakończenie przebiegu — komórki podmiotów, których to dotyczy, dostają biały obrys na planszy, a odpowiadające im wpisy w panelu zdarzeń są oznaczone `►`. Dzięki temu widać, że zmiana na mapie i wiersz w logu to ta sama rzecz. Wyróżnienie znika wraz z następnym tickiem, więc przy tempie 0,5× jest wyraźnie czytelne.
 
 Automatyczny przebieg zatrzymuje się sam po osiągnięciu wyniku terminalnego. Restart tworzy świeży scenariusz i świeżą instancję `Simulation` oraz czyści panel zdarzeń.
@@ -107,7 +109,7 @@ $env:GODOT_BIN = 'C:\sciezka\do\Godot_v4.7.2-stable_win64_console.exe'
 "%GODOT_BIN%" --headless --path . -s res://addons/gdUnit4/bin/GdUnitCmdTool.gd -a tests --ignoreHeadlessMode
 ```
 
-Wynik ostatniego uruchomienia: **85 przypadków testowych, 0 błędów, 0 failures, 0 flaky, 0 skipped, 0 orphans, exit code 0.**
+Wynik ostatniego uruchomienia: **86 przypadków testowych, 0 błędów, 0 failures, 0 flaky, 0 skipped, 0 orphans, exit code 0.**
 
 Flaga `--ignoreHeadlessMode` jest wymagana, ponieważ GdUnit4 domyślnie odmawia pracy w trybie headless. Nasze testy nie używają `InputEvent`, więc to ograniczenie ich nie dotyczy.
 

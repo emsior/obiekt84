@@ -150,3 +150,14 @@ Cel: tester ma skojarzyć zmianę na planszy z wpisem w logu bez podpowiedzi.
 - [ ] Wyróżnienie znika przy następnym ticku.
 - [ ] W wariancie sukcesu przy 0,5× widać kolejno wyróżnione ticki 38 (`SUSPICION`), 39 (`RETURN`), 40 (`PATROL` + `SUCCESS` + `FINISHED`).
 - [ ] Ukrycie panelu zdarzeń klawiszem `L` nie wyłącza wyróżnienia na planszy.
+
+## Oś czasu przebiegu
+
+- [ ] Pod planszą widać pasek z podpisem `tick 0` po lewej i numerem horyzontu po prawej.
+- [ ] W wariantach wykrycia i sukcesu horyzont wynosi `40`, w wariancie limitu `20`.
+- [ ] Biały kursor przesuwa się w prawo z każdym tickiem; przebyta część paska jest jaśniejsza.
+- [ ] Po zakończeniu przebiegu wykrycia widać dwie kreski: pomarańczową (tick 37) i czerwoną (tick 38).
+- [ ] W wariancie sukcesu widać trzy kreski: 38, 39 i czerwoną 40.
+- [ ] W wariancie limitu jedna czerwona kreska na końcu paska (tick 20).
+- [ ] Rutynowe waypointy **nie** mają kresek na osi.
+- [ ] Restart i zmiana wariantu czyszczą oś.

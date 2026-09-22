@@ -44,6 +44,7 @@ const DEFAULT_SPEED_INDEX := 1
 const ROUTINE_EVENT := "WAYPOINT_REACHED"
 
 @onready var _level_view: LevelView = $LevelL0
+@onready var _timeline: TimelineView = $Timeline
 @onready var _hud: Hud = $HudLayer/Hud
 @onready var _step_timer: Timer = $StepTimer
 
@@ -303,11 +304,30 @@ func highlight_cells() -> Array[Vector2i]:
 	return cells
 
 
+## Ticki całego przebiegu, w których wydarzyło się coś innego niż rutynowe
+## minięcie waypointu — materiał na znaczniki osi czasu.
+func timeline_event_ticks() -> Array[int]:
+	var ticks: Array[int] = []
+	for entry: Dictionary in _simulation.get_event_log():
+		if String(entry["event"]) == ROUTINE_EVENT:
+			continue
+		var tick := int(entry["tick"])
+		if not ticks.has(tick):
+			ticks.append(tick)
+	return ticks
+
+
+## Tick zakończenia przebiegu albo -1, gdy incydent jeszcze trwa.
+func terminal_tick() -> int:
+	return _simulation.get_tick() if _simulation.is_finished() else -1
+
+
 ## Widok i HUD czytają wyłącznie snapshot oraz kopię logu.
 func _render() -> void:
 	var snapshot := _simulation.get_state_snapshot()
 	var notable := notable_events()
 	_level_view.render(snapshot, highlight_cells())
+	_timeline.render(snapshot, timeline_event_ticks(), terminal_tick())
 	_hud.render(
 		snapshot,
 		_simulation.get_last_events(Hud.LOG_LINES),
