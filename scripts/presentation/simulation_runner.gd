@@ -39,6 +39,10 @@ const PLAYBACK_SPEEDS: Array[float] = [0.5, 1.0, 2.0]
 const PLAYBACK_SPEED_LABELS: Array[String] = ["Wolno", "Normalnie", "Szybko"]
 const DEFAULT_SPEED_INDEX := 1
 
+## Zdarzenie rutynowe — mijanie waypointu nie zasługuje na podświetlenie,
+## bo strażnik robi to co kilka ticków. Wszystko inne jest decyzją albo wynikiem.
+const ROUTINE_EVENT := "WAYPOINT_REACHED"
+
 @onready var _level_view: LevelView = $LevelL0
 @onready var _hud: Hud = $HudLayer/Hud
 @onready var _step_timer: Timer = $StepTimer
@@ -263,14 +267,52 @@ func _stop() -> void:
 	_step_timer.stop()
 
 
+# === wyróżnienie tego, co wydarzyło się w bieżącym ticku ======================
+
+## Zdarzenia z bieżącego ticka, które są warte uwagi testera.
+## Wyliczane z danych, które i tak już mamy — rdzeń nic o tym nie wie.
+func notable_events() -> Array[Dictionary]:
+	var tick := _simulation.get_tick()
+	var notable: Array[Dictionary] = []
+	for entry: Dictionary in _simulation.get_last_events(Hud.LOG_LINES):
+		if int(entry["tick"]) == tick and String(entry["event"]) != ROUTINE_EVENT:
+			notable.append(entry)
+	return notable
+
+
+## Komórki podmiotów, których dotyczą zdarzenia bieżącego ticka.
+## Dzięki temu tester widzi na planszy dokładnie to, co czyta w logu.
+func highlight_cells() -> Array[Vector2i]:
+	var snapshot := _simulation.get_state_snapshot()
+	var cells: Array[Vector2i] = []
+	for entry: Dictionary in notable_events():
+		var subject := String(entry["subject"])
+		var cell := Vector2i.ZERO
+		var found := false
+		if subject == String(snapshot["guard_id"]):
+			cell = snapshot["guard_position"]
+			found = true
+		elif subject == String(snapshot["intruder_id"]):
+			cell = snapshot["intruder_position"]
+			found = true
+		elif subject == String(snapshot["camera_id"]):
+			cell = snapshot["camera_position"]
+			found = true
+		if found and not cells.has(cell):
+			cells.append(cell)
+	return cells
+
+
 ## Widok i HUD czytają wyłącznie snapshot oraz kopię logu.
 func _render() -> void:
 	var snapshot := _simulation.get_state_snapshot()
-	_level_view.render(snapshot)
+	var notable := notable_events()
+	_level_view.render(snapshot, highlight_cells())
 	_hud.render(
 		snapshot,
 		_simulation.get_last_events(Hud.LOG_LINES),
 		{
+			"notable_events": notable,
 			"running": _running,
 			"finished": _simulation.is_finished(),
 			"overlay_visible": _overlay_visible,

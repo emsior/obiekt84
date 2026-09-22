@@ -139,3 +139,14 @@ Zachowanie tempa:
 - [ ] Po `R` wybrane tempo zostaje bez zmian.
 - [ ] Po przełączeniu wariantu `1` / `2` / `3` wybrane tempo zostaje bez zmian.
 - [ ] Po wyniku terminalnym zmiana tempa **nie** wznawia przebiegu — status zostaje `FINISHED`.
+
+## Wyróżnienie decyzji
+
+Cel: tester ma skojarzyć zmianę na planszy z wpisem w logu bez podpowiedzi.
+
+- [ ] Przy zwykłym mijaniu waypointu (ticki 1, 7, 15, 21, 29, 35 w wariancie wykrycia) **nic nie jest wyróżnione** — brak białego obrysu i brak `►` w logu.
+- [ ] W ticku 37 komórka strażnika dostaje biały obrys, a wiersz `SUSPICION` w panelu ma `►`.
+- [ ] W ticku 38 wyróżnione są **dwie** komórki: strażnika i intruza; w logu `►` mają trzy wiersze (`ALARM`, `DETECTED`, `FINISHED`).
+- [ ] Wyróżnienie znika przy następnym ticku.
+- [ ] W wariancie sukcesu przy 0,5× widać kolejno wyróżnione ticki 38 (`SUSPICION`), 39 (`RETURN`), 40 (`PATROL` + `SUCCESS` + `FINISHED`).
+- [ ] Ukrycie panelu zdarzeń klawiszem `L` nie wyłącza wyróżnienia na planszy.

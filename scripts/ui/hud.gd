@@ -25,6 +25,8 @@ const STATUS_FINISHED := "FINISHED"
 
 const MARKER_ACTIVE := "● "
 const MARKER_INACTIVE := "○ "
+## Znacznik wpisu, który jest jednocześnie wyróżniony na planszy.
+const MARKER_EVENT := "►"
 
 const COLOR_DETECTED := Color(0.95, 0.35, 0.30, 1.0)
 const COLOR_SUCCESS := Color(0.45, 0.88, 0.50, 1.0)
@@ -131,7 +133,7 @@ func render(snapshot: Dictionary, events: Array[Dictionary], ui_state: Dictionar
 	]))
 
 	_render_outcome(String(snapshot["outcome"]), int(snapshot["tick"]))
-	_render_log(events, log_visible)
+	_render_log(events, log_visible, ui_state["notable_events"] as Array[Dictionary])
 
 
 ## Aktywna pozycja w grupie jest oznaczona wypełnionym znacznikiem.
@@ -164,7 +166,12 @@ func _set_outcome_color(color: Color) -> void:
 	_outcome_label.add_theme_color_override("font_color", color)
 
 
-func _render_log(events: Array[Dictionary], log_visible: bool) -> void:
+## Wpisy z bieżącego ticka, które dostały wyróżnienie na planszy, są oznaczone
+## strzałką — dzięki temu widać, że biały obrys na mapie i ten wiersz to to samo.
+func _render_log(
+		events: Array[Dictionary],
+		log_visible: bool,
+		notable: Array[Dictionary]) -> void:
 	_log_label.visible = log_visible
 	if not log_visible:
 		return
@@ -173,7 +180,9 @@ func _render_log(events: Array[Dictionary], log_visible: bool) -> void:
 	if events.is_empty():
 		lines.append("  — brak zdarzeń —")
 	for entry: Dictionary in events:
-		lines.append("  %3d  %-12s %-18s %s" % [
+		var marker := MARKER_EVENT if notable.has(entry) else "  "
+		lines.append("%s %3d  %-12s %-18s %s" % [
+			marker,
 			int(entry["tick"]),
 			String(entry["subject"]),
 			String(entry["event"]),

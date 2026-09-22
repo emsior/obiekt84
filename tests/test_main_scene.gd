@@ -388,6 +388,37 @@ func test_restart_and_variant_selection_preserve_playback_speed() -> void:
 	assert_bool(bool(scene.get("_running"))).is_false()
 
 
+## Dymny test: wyróżniane są wyłącznie ticki, w których zapadła decyzja
+## albo wynik — rutynowe mijanie waypointów nie miga.
+func test_only_decision_ticks_are_highlighted() -> void:
+	var runner := scene_runner(MAIN_SCENE)
+	await runner.simulate_frames(1)
+	var scene := runner.scene()
+
+	# Tick 35 to zwykle minięcie waypointu.
+	for i in range(35):
+		scene.call("single_step")
+	assert_int(_simulation_of(scene).get_tick()).is_equal(35)
+	assert_array(scene.call("notable_events")) \
+		.append_failure_message("rutynowy waypoint nie powinien byc wyrozniony") \
+		.is_empty()
+	assert_array(scene.call("highlight_cells")).is_empty()
+
+	# Tick 37 to przejscie straznika w SUSPICION.
+	scene.call("single_step")
+	scene.call("single_step")
+	assert_int(_simulation_of(scene).get_tick()).is_equal(37)
+
+	var notable: Array = scene.call("notable_events")
+	assert_int(notable.size()) \
+		.append_failure_message("przejscie FSM powinno byc wyroznione") \
+		.is_equal(1)
+	assert_str(String(notable[0]["event"])).is_equal(GuardFsm.STATE_SUSPICION)
+	assert_array(scene.call("highlight_cells")) \
+		.append_failure_message("wyrozniona komorka straznika powinna byc wskazana") \
+		.contains([_simulation_of(scene).get_state_snapshot()["guard_position"]])
+
+
 ## Warstwa prezentacji nie może zawierać fizyki: żadnych ciał, obszarów,
 ## kształtów kolizji, raycastów ani agentów nawigacji.
 func test_presentation_contains_no_physics_nodes() -> void:

@@ -21,6 +21,7 @@ const COLOR_ROUTE_LINE := Color(0.34, 0.50, 0.66, 1.0)
 const COLOR_ROUTE_DONE := Color(0.24, 0.38, 0.30, 1.0)
 const COLOR_WAYPOINT := Color(0.58, 0.52, 0.24, 1.0)
 const COLOR_GOAL := Color(0.95, 0.90, 0.40, 1.0)
+const COLOR_HIGHLIGHT := Color(1.0, 1.0, 1.0, 0.92)
 const COLOR_CAMERA_CONE := Color(0.25, 0.55, 0.70, 0.22)
 const COLOR_GUARD_CONE := Color(0.80, 0.65, 0.20, 0.18)
 const COLOR_GUARD_CONE_SUSPICION := Color(0.95, 0.70, 0.20, 0.28)
@@ -37,11 +38,15 @@ const COLOR_INTRUDER_SUCCESS := Color(0.95, 0.90, 0.40, 1.0)
 
 var _snapshot: Dictionary = {}
 var _overlay_visible := true
+var _highlight_cells: Array[Vector2i] = []
 
 
-## Jedyne wejście warstwy widoku: snapshot odczytany z rdzenia.
-func render(snapshot: Dictionary) -> void:
+## Jedyne wejście warstwy widoku: snapshot odczytany z rdzenia oraz lista
+## komórek do wyróżnienia. Widok nie decyduje, co jest warte podświetlenia —
+## dostaje gotową listę od koordynatora.
+func render(snapshot: Dictionary, highlight_cells: Array[Vector2i] = []) -> void:
 	_snapshot = snapshot
+	_highlight_cells = highlight_cells
 
 	_guard_view.apply_state(
 		snapshot["guard_position"], snapshot["guard_facing"], CELL_SIZE)
@@ -87,6 +92,16 @@ func _draw() -> void:
 	_draw_waypoints()
 	_draw_goal()
 	_draw_grid(grid_size)
+	_draw_highlights()
+
+
+## Wyróżnienie komórek, w których w tym ticku coś się wydarzyło.
+## Rysowane na samym końcu, żeby nic go nie zasłaniało.
+func _draw_highlights() -> void:
+	for cell: Vector2i in _highlight_cells:
+		var top_left := Vector2(cell * CELL_SIZE) - Vector2.ONE * 2.0
+		var size := Vector2.ONE * (float(CELL_SIZE) + 4.0)
+		draw_rect(Rect2(top_left, size), COLOR_HIGHLIGHT, false, 3.0)
 
 
 func _draw_floor(grid_size: Vector2i) -> void:
