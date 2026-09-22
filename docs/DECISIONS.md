@@ -197,3 +197,15 @@ Format wpisu: data, decyzja, uzasadnienie, konsekwencje.
 **Uzasadnienie:** wariant to zestaw danych wejściowych, nie mechanika. Rdzeń nie potrzebuje wiedzieć, że ktoś chce obejrzeć inne zakończenie — `Simulation` przyjmuje dowolny `ScenarioL0` i pracuje tymi samymi regułami. Konfiguracja dwóch pól powtarza się między testami a koordynatorem, ale to powtórzenie **danych**, nie logiki gry; wyciąganie jej do rdzenia rozszerzyłoby publiczne API o coś potrzebne wyłącznie prezentacji i testom.
 
 **Konsekwencje:** wszystkie trzy zakończenia da się zobaczyć bez edytowania kodu, a rdzeń pozostaje nietknięty — ta tura nie zmieniła ani jednej linii w `scripts/core/` i `scripts/actors/`. Gdyby warianty kiedyś stały się częścią rozgrywki (wybór misji), trzeba będzie je przenieść do danych domenowych i odnotować to tutaj.
+
+---
+
+## 2026-09-22 — Przewijanie przebiegu przez odtworzenie, nie przez historię stanów
+
+**Decyzja:** cofanie i przewijanie w UI (`,`, `Home`, `End`, klik w oś czasu) realizuje `seek_to_tick(n)`, które buduje **świeżą** `Simulation` na tych samych danych i wykonuje dokładnie `n` kroków. Nie ma historii snapshotów, stosu undo ani zapisywania stanów pośrednich.
+
+**Uzasadnienie:** historia stanów kosztowałaby pamięć, wymagała serializacji całego `SimulationState` i wprowadziła drugie źródło prawdy o przeszłości przebiegu — czyli dokładnie to, czego architektura L0 unika. Odtworzenie jest darmowe, bo przebieg ma kilkadziesiąt ticków, a rdzeń nie ma żadnego wejścia poza danymi scenariusza. Przy 38 tickach przewinięcie to 38 wywołań `step()`.
+
+**Konsekwencje — i to jest istotne:** determinizm przestał być wyłącznie właściwością testów, a stał się **warunkiem poprawności funkcji, której używa człowiek**. Gdyby rdzeń przestał być deterministyczny, przewijanie zaczęłoby pokazywać inny przebieg niż ten, który tester przed chwilą oglądał — i byłoby to widoczne gołym okiem, bez patrzenia w testy. Testy 50/50 i golden logi pozostają pierwszą linią obrony, ale przewijanie jest teraz drugą, działającą w czasie rzeczywistym.
+
+Praktyczna konsekwencja dla przyszłych zmian: **każde wprowadzenie stanu, który nie wynika z danych scenariusza i liczby wywołań `step()`, złamie przewijanie.** Dotyczy to w szczególności jakiejkolwiek losowości, zależności od czasu systemowego i trzymania stanu w node'ach. Zakazy z `CLAUDE.md` mają więc od teraz widoczny objaw naruszenia, nie tylko czerwony test.
