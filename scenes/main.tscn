@@ -1,138 +1,156 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene format=3 uid="uid://c6psgjkcritct"]
 
-[ext_resource type="Script" path="res://scripts/presentation/simulation_runner.gd" id="1_runner"]
+[ext_resource type="Script" uid="uid://6c2amksfg8s0" path="res://scripts/presentation/simulation_runner.gd" id="1_runner"]
 [ext_resource type="PackedScene" path="res://scenes/level_l0.tscn" id="2_level"]
-[ext_resource type="Script" path="res://scripts/ui/hud.gd" id="3_hud"]
-[ext_resource type="Script" path="res://scripts/presentation/timeline_view.gd" id="4_timeline"]
+[ext_resource type="Script" uid="uid://c3ossni2vs6gx" path="res://scripts/ui/hud.gd" id="3_hud"]
+[ext_resource type="Script" uid="uid://78ybq8u2a07s" path="res://scripts/presentation/timeline_view.gd" id="4_timeline"]
 
-[node name="Main" type="Node2D"]
+[node name="Main" type="Node2D" unique_id=930997715]
 script = ExtResource("1_runner")
 
-[node name="Background" type="ColorRect" parent="."]
+[node name="Background" type="ColorRect" parent="." unique_id=1869562724]
 offset_right = 1280.0
 offset_bottom = 800.0
 color = Color(0.05, 0.06, 0.08, 1)
 
-[node name="LevelL0" parent="." instance=ExtResource("2_level")]
+[node name="LevelL0" parent="." unique_id=187939788 instance=ExtResource("2_level")]
 position = Vector2(32, 48)
 
-[node name="Timeline" type="Node2D" parent="."]
+[node name="Timeline" type="Node2D" parent="." unique_id=1036542248]
 position = Vector2(32, 640)
 script = ExtResource("4_timeline")
 
-[node name="StepTimer" type="Timer" parent="."]
+[node name="StepTimer" type="Timer" parent="." unique_id=1257730544]
 wait_time = 0.1
 
-[node name="HudLayer" type="CanvasLayer" parent="."]
+[node name="HudLayer" type="CanvasLayer" parent="." unique_id=1766523953]
 
-[node name="Hud" type="Control" parent="HudLayer"]
+[node name="Hud" type="Control" parent="HudLayer" unique_id=894336242]
+layout_mode = 3
+anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 script = ExtResource("3_hud")
 
-[node name="OutcomeLabel" type="Label" parent="HudLayer/Hud"]
+[node name="OutcomeLabel" type="Label" parent="HudLayer/Hud" unique_id=371096866]
+layout_mode = 0
 offset_left = 620.0
 offset_top = 12.0
 offset_right = 1260.0
 offset_bottom = 44.0
 text = "incydent w toku"
 
-[node name="ScenarioLabel" type="Label" parent="HudLayer/Hud"]
+[node name="ScenarioLabel" type="Label" parent="HudLayer/Hud" unique_id=1518893494]
+layout_mode = 0
 offset_left = 620.0
 offset_top = 50.0
 offset_right = 1260.0
 offset_bottom = 74.0
 
-[node name="DetectionButton" type="Button" parent="HudLayer/Hud"]
+[node name="DetectionButton" type="Button" parent="HudLayer/Hud" unique_id=1017999858]
+layout_mode = 0
 offset_left = 620.0
 offset_top = 80.0
 offset_right = 800.0
 offset_bottom = 112.0
 text = "Wykrycie [1]"
 
-[node name="SuccessButton" type="Button" parent="HudLayer/Hud"]
+[node name="SuccessButton" type="Button" parent="HudLayer/Hud" unique_id=1197454618]
+layout_mode = 0
 offset_left = 810.0
 offset_top = 80.0
 offset_right = 990.0
 offset_bottom = 112.0
 text = "Sukces [2]"
 
-[node name="TickLimitButton" type="Button" parent="HudLayer/Hud"]
+[node name="TickLimitButton" type="Button" parent="HudLayer/Hud" unique_id=1663004722]
+layout_mode = 0
 offset_left = 1000.0
 offset_top = 80.0
 offset_right = 1200.0
 offset_bottom = 112.0
 text = "Limit ticków [3]"
 
-[node name="StartButton" type="Button" parent="HudLayer/Hud"]
+[node name="StartButton" type="Button" parent="HudLayer/Hud" unique_id=816287224]
+layout_mode = 0
 offset_left = 620.0
 offset_top = 118.0
 offset_right = 712.0
 offset_bottom = 150.0
 text = "Start"
 
-[node name="PauseButton" type="Button" parent="HudLayer/Hud"]
+[node name="PauseButton" type="Button" parent="HudLayer/Hud" unique_id=107779745]
+layout_mode = 0
 offset_left = 722.0
 offset_top = 118.0
 offset_right = 826.0
 offset_bottom = 150.0
 text = "Pauza"
 
-[node name="RestartButton" type="Button" parent="HudLayer/Hud"]
+[node name="RestartButton" type="Button" parent="HudLayer/Hud" unique_id=894998815]
+layout_mode = 0
 offset_left = 836.0
 offset_top = 118.0
 offset_right = 940.0
 offset_bottom = 150.0
 text = "Restart"
 
-[node name="StepBackButton" type="Button" parent="HudLayer/Hud"]
+[node name="StepBackButton" type="Button" parent="HudLayer/Hud" unique_id=1726882721]
+layout_mode = 0
 offset_left = 950.0
 offset_top = 118.0
 offset_right = 1096.0
 offset_bottom = 150.0
 text = "◀ krok [,]"
 
-[node name="StepForwardButton" type="Button" parent="HudLayer/Hud"]
+[node name="StepForwardButton" type="Button" parent="HudLayer/Hud" unique_id=1846224485]
+layout_mode = 0
 offset_left = 1102.0
 offset_top = 118.0
 offset_right = 1248.0
 offset_bottom = 150.0
 text = "krok [.] ▶"
 
-[node name="SlowButton" type="Button" parent="HudLayer/Hud"]
+[node name="SlowButton" type="Button" parent="HudLayer/Hud" unique_id=1903161584]
+layout_mode = 0
 offset_left = 620.0
 offset_top = 156.0
 offset_right = 820.0
 offset_bottom = 188.0
 text = "Wolno 0,5x"
 
-[node name="NormalButton" type="Button" parent="HudLayer/Hud"]
+[node name="NormalButton" type="Button" parent="HudLayer/Hud" unique_id=1047300593]
+layout_mode = 0
 offset_left = 826.0
 offset_top = 156.0
 offset_right = 1026.0
 offset_bottom = 188.0
 text = "Normalnie 1x"
 
-[node name="FastButton" type="Button" parent="HudLayer/Hud"]
+[node name="FastButton" type="Button" parent="HudLayer/Hud" unique_id=1133543640]
+layout_mode = 0
 offset_left = 1032.0
 offset_top = 156.0
 offset_right = 1232.0
 offset_bottom = 188.0
 text = "Szybko 2x"
 
-[node name="StatusLabel" type="Label" parent="HudLayer/Hud"]
+[node name="StatusLabel" type="Label" parent="HudLayer/Hud" unique_id=1199847557]
+layout_mode = 0
 offset_left = 620.0
 offset_top = 194.0
 offset_right = 1260.0
 offset_bottom = 434.0
 
-[node name="LegendLabel" type="Label" parent="HudLayer/Hud"]
+[node name="LegendLabel" type="Label" parent="HudLayer/Hud" unique_id=527549512]
+layout_mode = 0
 offset_left = 620.0
 offset_top = 440.0
 offset_right = 1260.0
 offset_bottom = 552.0
 
-[node name="LogLabel" type="Label" parent="HudLayer/Hud"]
+[node name="LogLabel" type="Label" parent="HudLayer/Hud" unique_id=970205752]
+layout_mode = 0
 offset_left = 620.0
 offset_top = 558.0
 offset_right = 1260.0

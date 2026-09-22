@@ -16,3 +16,6 @@
 # Lokalne ustawienia IDE
 /.vscode/
 /.idea/
+
+# Lokalna konfiguracja runnera GdUnit4, generowana przy uruchomieniu testów z UI edytora
+/addons/gdUnit4/GdUnitRunner.cfg
