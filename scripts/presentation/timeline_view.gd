@@ -14,6 +14,8 @@ extends Node2D
 const WIDTH := 560.0
 const HEIGHT := 26.0
 const DEFAULT_HORIZON := 40
+## Zapas nad i pod paskiem, żeby kliknięcie nie wymagało celowania co do piksela.
+const HIT_PADDING := 8.0
 
 const COLOR_TRACK := Color(0.13, 0.14, 0.17, 1.0)
 const COLOR_TRACK_BORDER := Color(0.30, 0.33, 0.38, 1.0)
@@ -42,6 +44,22 @@ func render(snapshot: Dictionary, event_ticks: Array[int], terminal_tick: int) -
 
 func horizon() -> int:
 	return _horizon
+
+
+## Obszar kliknięcia — nieco wyższy niż sam pasek, żeby trafienie było wygodne.
+## Zwykła matematyka prostokąta: żadnego Area2D ani kolizji.
+func hit_rect() -> Rect2:
+	return Rect2(Vector2(0.0, -HIT_PADDING), Vector2(WIDTH, HEIGHT + HIT_PADDING * 2.0))
+
+
+func contains_global_point(global_point: Vector2) -> bool:
+	return hit_rect().has_point(to_local(global_point))
+
+
+## Tick odpowiadający wskazanemu punktowi na pasku.
+func tick_at_global_point(global_point: Vector2) -> int:
+	var x := clampf(to_local(global_point).x, 0.0, WIDTH)
+	return int(roundf(float(_horizon) * x / WIDTH))
 
 
 static func _compute_horizon(max_ticks: int, tick: int) -> int:
@@ -97,5 +115,5 @@ func _draw_labels() -> void:
 		HORIZONTAL_ALIGNMENT_LEFT, -1.0, size, COLOR_TEXT)
 	draw_string(font, Vector2(WIDTH - 60.0, HEIGHT + 14.0), "%d" % _horizon,
 		HORIZONTAL_ALIGNMENT_RIGHT, 60.0, size, COLOR_TEXT)
-	draw_string(font, Vector2(0.0, -6.0), "przebieg: tick %d" % _tick,
+	draw_string(font, Vector2(0.0, -6.0), "przebieg: tick %d   (kliknij, aby przewinąć)" % _tick,
 		HORIZONTAL_ALIGNMENT_LEFT, -1.0, size, COLOR_TEXT)

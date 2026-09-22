@@ -76,6 +76,9 @@ func _ready() -> void:
 ## Sterowanie klawiaturą. Wejście należy wyłącznie do warstwy prezentacji —
 ## rdzeń nigdy go nie widzi.
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		_handle_mouse_button(event as InputEventMouseButton)
+		return
 	if not (event is InputEventKey) or not event.is_pressed() or event.is_echo():
 		return
 
@@ -103,10 +106,24 @@ func _unhandled_input(event: InputEvent) -> void:
 			step_speed(-1)
 		KEY_BRACKETRIGHT:
 			step_speed(1)
+		KEY_HOME:
+			seek_to_tick(0)
+		KEY_END:
+			seek_to_end()
 		KEY_ESCAPE:
 			pause()
 		_:
 			return
+	get_viewport().set_input_as_handled()
+
+
+## Kliknięcie w oś czasu przewija przebieg do wskazanego ticka.
+func _handle_mouse_button(event: InputEventMouseButton) -> void:
+	if not event.pressed or event.button_index != MOUSE_BUTTON_LEFT:
+		return
+	if not _timeline.contains_global_point(event.global_position):
+		return
+	seek_to_tick(_timeline.tick_at_global_point(event.global_position))
 	get_viewport().set_input_as_handled()
 
 
@@ -214,6 +231,12 @@ func seek_to_tick(target: int) -> void:
 			break
 		_simulation.step()
 	_render()
+
+
+## Przewinięcie do końca przebiegu. Pętla w [method seek_to_tick] i tak kończy
+## się na stanie terminalnym, więc limit scenariusza jest tu tylko górną granicą.
+func seek_to_end() -> void:
+	seek_to_tick(int(_simulation.get_state_snapshot()["max_ticks"]))
 
 
 ## Cofnięcie o jeden tick. Na ticku 0 nie robi nic.

@@ -39,7 +39,8 @@ const COLOR_NEUTRAL := Color(0.82, 0.84, 0.88, 1.0)
 const LEGEND := """Sterowanie
   1 / 2 / 3  wariant incydentu        [ / ]  tempo 0,5× / 1× / 2×
   Spacja  start / pauza      , / .  krok wstecz / naprzód      N  jeden tick
-  R  restart wariantu      F  stożki widzenia      L  panel      Esc  pauza"""
+  R  restart wariantu      F  stożki widzenia      L  panel      Esc  pauza
+  Home / End  początek / koniec przebiegu      klik w oś czasu  przewiń"""
 
 @onready var _scenario_label: Label = $ScenarioLabel
 @onready var _detection_button: Button = $DetectionButton

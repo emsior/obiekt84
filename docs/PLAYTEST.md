@@ -175,3 +175,15 @@ Cofanie nie jest mechanizmem undo — to odtworzenie przebiegu od zera do wskaza
 - [ ] Cofanie zachowuje wybrany wariant i tempo.
 - [ ] Cofanie zatrzymuje automatyczny przebieg.
 - [ ] Przyciski `◀ krok [,]` i `krok [.] ▶` działają identycznie jak klawisze.
+
+## Przewijanie osi czasu
+
+- [ ] Nad paskiem widać podpis `przebieg: tick N   (kliknij, aby przewinąć)`.
+- [ ] Kliknięcie w połowie paska przewija do ticka `20` (przy horyzoncie 40).
+- [ ] Kliknięcie tuż przed prawym końcem przewija do ticka `38` i pokazuje wynik wykrycia.
+- [ ] Kliknięcie na lewej krawędzi wraca do ticka `0`.
+- [ ] Kliknięcie poza paskiem — na planszy albo w HUD — nic nie przewija.
+- [ ] Trafienie działa też kilka pikseli nad i pod paskiem, nie trzeba celować co do piksela.
+- [ ] `Home` wraca na tick 0, `End` dociąga do wyniku terminalnego.
+- [ ] `End` w wariancie limitu zatrzymuje się na ticku 20, nie na 400.
+- [ ] Przewinięcie zatrzymuje automatyczny przebieg i zachowuje wariant oraz tempo.

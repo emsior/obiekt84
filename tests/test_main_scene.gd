@@ -482,6 +482,69 @@ func test_step_back_replays_run_deterministically() -> void:
 	assert_int(_simulation_of(scene).get_tick()).is_equal(0)
 
 
+## Dymny test: oś czasu odwzorowuje piksel na tick i przewija po kliknięciu.
+## Trafienie liczone jest matematyką prostokąta, bez Area2D i kolizji.
+func test_timeline_click_seeks_to_tick() -> void:
+	var runner := scene_runner(MAIN_SCENE)
+	await runner.simulate_frames(1)
+	var scene := runner.scene()
+	var timeline := scene.get_node("Timeline") as TimelineView
+	var origin: Vector2 = timeline.global_position
+
+	assert_int(timeline.horizon()).is_equal(40)
+	assert_int(timeline.tick_at_global_point(origin + Vector2(0.0, 13.0))).is_equal(0)
+	assert_int(timeline.tick_at_global_point(
+		origin + Vector2(TimelineView.WIDTH * 0.5, 13.0))).is_equal(20)
+	assert_int(timeline.tick_at_global_point(
+		origin + Vector2(TimelineView.WIDTH, 13.0))).is_equal(40)
+
+	assert_bool(timeline.contains_global_point(origin + Vector2(280.0, 13.0))).is_true()
+	assert_bool(timeline.contains_global_point(origin + Vector2(280.0, 200.0))) \
+		.append_failure_message("punkt daleko pod paskiem nie moze byc trafieniem") \
+		.is_false()
+
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	click.global_position = origin + Vector2(TimelineView.WIDTH * 0.5, 13.0)
+	scene.call("_unhandled_input", click)
+
+	assert_int(_simulation_of(scene).get_tick()) \
+		.append_failure_message("klikniecie w os czasu powinno przewinac przebieg") \
+		.is_equal(20)
+	assert_bool(bool(scene.get("_running"))).is_false()
+
+	# Klikniecie poza osia nie rusza przebiegu.
+	var outside := InputEventMouseButton.new()
+	outside.button_index = MOUSE_BUTTON_LEFT
+	outside.pressed = true
+	outside.global_position = origin + Vector2(280.0, 200.0)
+	scene.call("_unhandled_input", outside)
+	assert_int(_simulation_of(scene).get_tick()).is_equal(20)
+
+
+## Dymny test: Home wraca na początek, End dociąga do wyniku terminalnego.
+func test_seek_to_end_reaches_terminal_outcome() -> void:
+	var runner := scene_runner(MAIN_SCENE)
+	await runner.simulate_frames(1)
+	var scene := runner.scene()
+
+	scene.call("seek_to_end")
+	assert_bool(_simulation_of(scene).is_finished()).is_true()
+	assert_int(_simulation_of(scene).get_tick()).is_equal(38)
+
+	scene.call("seek_to_tick", 0)
+	assert_int(_simulation_of(scene).get_tick()).is_equal(0)
+	assert_bool(_simulation_of(scene).is_finished()).is_false()
+
+	# Wariant limitu konczy sie na swoim limicie, nie na 400.
+	scene.call("select_variant", VARIANT_TICK_LIMIT)
+	scene.call("seek_to_end")
+	assert_int(_simulation_of(scene).get_tick()).is_equal(20)
+	assert_str(_simulation_of(scene).get_outcome()) \
+		.is_equal(SimulationState.OUTCOME_TICK_LIMIT)
+
+
 ## Warstwa prezentacji nie może zawierać fizyki: żadnych ciał, obszarów,
 ## kształtów kolizji, raycastów ani agentów nawigacji.
 func test_presentation_contains_no_physics_nodes() -> void:
