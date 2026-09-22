@@ -85,6 +85,20 @@ offset_right = 940.0
 offset_bottom = 142.0
 text = "Restart"
 
+[node name="StepBackButton" type="Button" parent="HudLayer/Hud"]
+offset_left = 950.0
+offset_top = 110.0
+offset_right = 1096.0
+offset_bottom = 142.0
+text = "◀ krok [,]"
+
+[node name="StepForwardButton" type="Button" parent="HudLayer/Hud"]
+offset_left = 1102.0
+offset_top = 110.0
+offset_right = 1248.0
+offset_bottom = 142.0
+text = "krok [.] ▶"
+
 [node name="SlowButton" type="Button" parent="HudLayer/Hud"]
 offset_left = 620.0
 offset_top = 148.0

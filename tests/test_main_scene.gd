@@ -440,6 +440,48 @@ func test_timeline_marks_decision_ticks_and_terminal_tick() -> void:
 	assert_int(int(scene.call("terminal_tick"))).is_equal(38)
 
 
+## Dymny test: cofanie działa dzięki determinizmowi rdzenia — odtworzenie
+## przebiegu do tego samego ticka daje identyczny log i snapshot.
+func test_step_back_replays_run_deterministically() -> void:
+	var runner := scene_runner(MAIN_SCENE)
+	await runner.simulate_frames(1)
+	var scene := runner.scene()
+
+	for i in range(60):
+		scene.call("single_step")
+	var terminal_log := _simulation_of(scene).get_canonical_log()
+	assert_int(_simulation_of(scene).get_tick()).is_equal(38)
+
+	# Cofniecie odblokowuje dalsza gre: stan przestaje byc terminalny.
+	scene.call("step_back")
+	assert_int(_simulation_of(scene).get_tick()).is_equal(37)
+	assert_bool(_simulation_of(scene).is_finished()) \
+		.append_failure_message("po cofnieciu przebieg nie powinien byc zakonczony") \
+		.is_false()
+	assert_bool(bool(scene.get("_running"))).is_false()
+
+	# Ponowne dojscie do konca musi dac dokladnie ten sam log.
+	scene.call("single_step")
+	assert_str(_simulation_of(scene).get_canonical_log()) \
+		.append_failure_message("odtworzony przebieg rozni sie od oryginalnego") \
+		.is_equal(terminal_log)
+
+	# seek_to_tick(n) jest rownowazne n pojedynczym krokom.
+	scene.call("seek_to_tick", 20)
+	var seek_snapshot := _simulation_of(scene).get_canonical_snapshot()
+	scene.call("seek_to_tick", 0)
+	for i in range(20):
+		scene.call("single_step")
+	assert_str(_simulation_of(scene).get_canonical_snapshot()) \
+		.append_failure_message("seek_to_tick rozni sie od krokow po jednym ticku") \
+		.is_equal(seek_snapshot)
+
+	# Na ticku 0 cofanie jest bezpiecznym no-op.
+	scene.call("seek_to_tick", 0)
+	scene.call("step_back")
+	assert_int(_simulation_of(scene).get_tick()).is_equal(0)
+
+
 ## Warstwa prezentacji nie może zawierać fizyki: żadnych ciał, obszarów,
 ## kształtów kolizji, raycastów ani agentów nawigacji.
 func test_presentation_contains_no_physics_nodes() -> void:

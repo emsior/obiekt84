@@ -15,6 +15,9 @@ signal restart_requested
 signal variant_requested(variant_index: int)
 ## Prośba o zmianę tempa podglądu. Zmiany dokonuje koordynator.
 signal speed_requested(speed_index: int)
+## Prośba o cofnięcie lub wykonanie jednego ticka.
+signal step_back_requested
+signal step_forward_requested
 
 ## Ile ostatnich zdarzeń pokazuje panel.
 const LOG_LINES := 12
@@ -35,8 +38,8 @@ const COLOR_NEUTRAL := Color(0.82, 0.84, 0.88, 1.0)
 
 const LEGEND := """Sterowanie
   1 / 2 / 3  wariant incydentu        [ / ]  tempo 0,5× / 1× / 2×
-  Spacja  start / pauza      N  jeden tick      R  restart wariantu
-  F  stożki widzenia      L  panel zdarzeń      Esc  pauza"""
+  Spacja  start / pauza      , / .  krok wstecz / naprzód      N  jeden tick
+  R  restart wariantu      F  stożki widzenia      L  panel      Esc  pauza"""
 
 @onready var _scenario_label: Label = $ScenarioLabel
 @onready var _detection_button: Button = $DetectionButton
@@ -48,6 +51,8 @@ const LEGEND := """Sterowanie
 @onready var _start_button: Button = $StartButton
 @onready var _pause_button: Button = $PauseButton
 @onready var _restart_button: Button = $RestartButton
+@onready var _step_back_button: Button = $StepBackButton
+@onready var _step_forward_button: Button = $StepForwardButton
 @onready var _status_label: Label = $StatusLabel
 @onready var _outcome_label: Label = $OutcomeLabel
 @onready var _legend_label: Label = $LegendLabel
@@ -64,6 +69,8 @@ func _ready() -> void:
 	_start_button.pressed.connect(func() -> void: start_requested.emit())
 	_pause_button.pressed.connect(func() -> void: pause_toggle_requested.emit())
 	_restart_button.pressed.connect(func() -> void: restart_requested.emit())
+	_step_back_button.pressed.connect(func() -> void: step_back_requested.emit())
+	_step_forward_button.pressed.connect(func() -> void: step_forward_requested.emit())
 
 	_variant_buttons = [_detection_button, _success_button, _tick_limit_button]
 	for index in _variant_buttons.size():
@@ -96,6 +103,8 @@ func render(snapshot: Dictionary, events: Array[Dictionary], ui_state: Dictionar
 	_start_button.disabled = running or finished
 	_pause_button.disabled = finished
 	_pause_button.text = "Pauza" if running else "Wznów"
+	_step_back_button.disabled = int(snapshot["tick"]) <= 0
+	_step_forward_button.disabled = finished
 
 	_status_label.text = "\n".join(PackedStringArray([
 		"SCENARIUSZ: %s" % String(ui_state["variant_name"]),

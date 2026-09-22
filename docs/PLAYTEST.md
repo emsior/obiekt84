@@ -161,3 +161,17 @@ Cel: tester ma skojarzyć zmianę na planszy z wpisem w logu bez podpowiedzi.
 - [ ] W wariancie limitu jedna czerwona kreska na końcu paska (tick 20).
 - [ ] Rutynowe waypointy **nie** mają kresek na osi.
 - [ ] Restart i zmiana wariantu czyszczą oś.
+
+## Cofanie przebiegu
+
+Cofanie nie jest mechanizmem undo — to odtworzenie przebiegu od zera do wskazanego ticka. Działa, bo rdzeń jest deterministyczny.
+
+- [ ] Po zakończeniu wariantu wykrycia (`tick 38`) klawisz `,` cofa do ticka 37.
+- [ ] Status przestaje być `FINISHED`, komunikat końcowy wraca na `incydent w toku`.
+- [ ] Strażnik jest znowu w stanie `SUSPICION`, a jego komórka wyróżniona.
+- [ ] `.` albo `N` doprowadza z powrotem do ticka 38 i **tego samego** wyniku.
+- [ ] Wielokrotne cofanie i odtwarzanie nigdy nie zmienia wyniku ani panelu zdarzeń.
+- [ ] Na ticku 0 `,` nic nie robi, a przycisk `◀ krok` jest wyszarzony.
+- [ ] Cofanie zachowuje wybrany wariant i tempo.
+- [ ] Cofanie zatrzymuje automatyczny przebieg.
+- [ ] Przyciski `◀ krok [,]` i `krok [.] ▶` działają identycznie jak klawisze.

@@ -66,6 +66,8 @@ func _ready() -> void:
 	_hud.restart_requested.connect(_on_restart_requested)
 	_hud.variant_requested.connect(select_variant)
 	_hud.speed_requested.connect(select_speed_index)
+	_hud.step_back_requested.connect(step_back)
+	_hud.step_forward_requested.connect(single_step)
 
 	_level_view.set_overlay_visible(_overlay_visible)
 	_rebuild_simulation()
@@ -87,8 +89,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			select_variant(ScenarioVariant.TICK_LIMIT)
 		KEY_SPACE:
 			_on_pause_toggle_requested()
-		KEY_N:
+		KEY_N, KEY_PERIOD:
 			single_step()
+		KEY_COMMA:
+			step_back()
 		KEY_R:
 			_on_restart_requested()
 		KEY_F:
@@ -190,10 +194,34 @@ func _build_scenario() -> ScenarioL0:
 
 ## Świeża symulacja na świeżych danych plus czysty stan prezentacji.
 func _rebuild_simulation() -> void:
+	seek_to_tick(0)
+
+
+## Przewinięcie przebiegu do wskazanego ticka.
+##
+## Działa **dzięki determinizmowi rdzenia**: nie ma cofania stanu ani historii
+## snapshotów — budujemy świeżą symulację na tych samych danych i wykonujemy
+## dokładnie [param target] kroków. Ten sam scenariusz zawsze daje ten sam
+## przebieg, więc odtworzony tick jest identyczny z oryginalnym.
+##
+## Przewijanie zatrzymuje automatyczny przebieg i zachowuje wariant oraz tempo.
+func seek_to_tick(target: int) -> void:
 	_stop()
 	_simulation = Simulation.new()
 	_simulation.initialize(_build_scenario())
+	for i in range(maxi(0, target)):
+		if _simulation.is_finished():
+			break
+		_simulation.step()
 	_render()
+
+
+## Cofnięcie o jeden tick. Na ticku 0 nie robi nic.
+func step_back() -> void:
+	var tick := _simulation.get_tick()
+	if tick <= 0:
+		return
+	seek_to_tick(tick - 1)
 
 
 # === sterowanie przebiegiem ===================================================
