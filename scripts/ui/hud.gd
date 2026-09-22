@@ -19,8 +19,14 @@ signal speed_requested(speed_index: int)
 signal step_back_requested
 signal step_forward_requested
 
-## Ile ostatnich zdarzeń pokazuje panel.
-const LOG_LINES := 12
+## Ile ostatnich zdarzeń pokazuje panel. Wartość wynika z dostępnej wysokości:
+## nagłówek, pusty wiersz i 11 wpisów mieszczą się w słupku HUD przy 1280 × 800.
+const LOG_LINES := 11
+
+## Panel zdarzeń ma własny, mniejszy rozmiar czcionki. Najdłuższy wiersz to
+## 70 znaków — powód `intruder_visible_consecutive_ticks` pochodzi z rdzenia
+## i nie wolno go skracać, więc to rozmiar musi ustąpić, nie treść.
+const LOG_FONT_SIZE := 13
 
 const STATUS_RUNNING := "RUNNING"
 const STATUS_PAUSED := "PAUSED"
@@ -38,11 +44,14 @@ const COLOR_SUCCESS := Color(0.45, 0.88, 0.50, 1.0)
 const COLOR_TICK_LIMIT := Color(0.98, 0.72, 0.25, 1.0)
 const COLOR_NEUTRAL := Color(0.82, 0.84, 0.88, 1.0)
 
+## Wiersze mieszczą się w 640 px przy czcionce 16 px o stałej szerokości
+## (ok. 9,7 px na znak), czyli maksymalnie 65 znaków. Dłuższy wiersz rozepchnąłby
+## etykietę poza prawą krawędź viewportu.
 const LEGEND := """Sterowanie
-  1 / 2 / 3  wariant incydentu        [ / ]  tempo 0,5× / 1× / 2×
-  Spacja  start / pauza      , / .  krok wstecz / naprzód      N  jeden tick
-  R  restart wariantu      F  stożki widzenia      L  panel      Esc  pauza
-  Home / End  początek / koniec przebiegu      klik w oś czasu  przewiń"""
+  1 2 3  wariant       [ ]  tempo       Spacja  start / pauza
+  , .  krok wstecz / naprzód      N  tick      R  restart
+  Home End  początek / koniec     klik w oś czasu  przewiń
+  F  stożki      L  panel zdarzeń      Esc  pauza"""
 
 @onready var _scenario_label: Label = $ScenarioLabel
 @onready var _detection_button: Button = $DetectionButton
@@ -159,6 +168,7 @@ func _apply_monospace_font() -> void:
 		"monospace", "Consolas", "DejaVu Sans Mono", "Courier New"])
 	for label: Label in [_status_label, _legend_label, _log_label]:
 		label.add_theme_font_override("font", font)
+	_log_label.add_theme_font_size_override("font_size", LOG_FONT_SIZE)
 
 
 ## Aktywna pozycja w grupie jest oznaczona wypełnionym znacznikiem.
@@ -206,7 +216,7 @@ func _render_log(
 		lines.append("  — brak zdarzeń —")
 	for entry: Dictionary in events:
 		var marker := MARKER_EVENT if notable.has(entry) else MARKER_EVENT_NONE
-		lines.append("%s %3d  %-12s %-18s %s" % [
+		lines.append("%s %3d %-11s %-16s %s" % [
 			marker,
 			int(entry["tick"]),
 			String(entry["subject"]),

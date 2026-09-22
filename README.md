@@ -82,7 +82,7 @@ Wybór wariantu natychmiast restartuje przebieg: świeże dane, świeża `Simula
 
 Plansza 20 × 20 po lewej: ciemna podłoga, obrys granicy, trasa intruza zaznaczona komórka po komórce (przebyty odcinek ma inny odcień), cztery waypointy patrolu z pogrubionym aktualnym celem, żółty marker celu intruza, kamera i strażnik ze znacznikiem kierunku. Stożki widzenia zmieniają kolor razem ze stanem strażnika: żółty w `PATROL`, jaśniejszy w `SUSPICION`, czerwony w `ALARM`.
 
-HUD po prawej: komunikat końcowy (czerwony — wykrycie, zielony — sukces intruza, pomarańczowy — limit ticków), status `PAUSED` / `RUNNING` / `FINISHED`, tick i limit ticków, tempo podglądu, stany strażnika i intruza, legenda sterowania oraz panel dwunastu ostatnich zdarzeń w kolejności chronologicznej.
+HUD po prawej: komunikat końcowy (czerwony — wykrycie, zielony — sukces intruza, pomarańczowy — limit ticków), status `PAUSED` / `RUNNING` / `FINISHED`, tick i limit ticków, tempo podglądu, stany strażnika i intruza, legenda sterowania oraz panel jedenastu ostatnich zdarzeń w kolejności chronologicznej.
 
 **Cofanie i przewijanie.** Klawisz `,` cofa symulację o jeden tick, `Home` i `End` skaczą na początek i koniec przebiegu, a kliknięcie w oś czasu przewija do wskazanego ticka. Nie ma tu historii stanów ani mechanizmu undo — działa to **dzięki determinizmowi rdzenia**: „idź do ticka N" to świeża `Simulation` na tych samych danych i dokładnie N kroków. Ten sam scenariusz zawsze daje ten sam przebieg, więc odtworzony tick jest identyczny z oryginalnym. Po zakończonym incydencie można się cofnąć przed moment wykrycia, zwolnić do 0,5× i obejrzeć decyzję strażnika jeszcze raz — stan przestaje być terminalny i przebieg da się doprowadzić do końca ponownie.
 
@@ -114,7 +114,7 @@ $env:GODOT_BIN = 'C:\sciezka\do\Godot_v4.7.2-stable_win64_console.exe'
 "%GODOT_BIN%" --headless --path . -s res://addons/gdUnit4/bin/GdUnitCmdTool.gd -a tests --ignoreHeadlessMode
 ```
 
-Wynik ostatniego uruchomienia: **89 przypadków testowych, 0 błędów, 0 failures, 0 flaky, 0 skipped, 0 orphans, exit code 0.**
+Wynik ostatniego uruchomienia: **92 przypadki testowe, 0 błędów, 0 failures, 0 flaky, 0 skipped, 0 orphans, exit code 0.**
 
 Flaga `--ignoreHeadlessMode` jest wymagana, ponieważ GdUnit4 domyślnie odmawia pracy w trybie headless. Nasze testy nie używają `InputEvent`, więc to ograniczenie ich nie dotyczy.
 

@@ -11,6 +11,11 @@ const MAIN_SCENE := "res://scenes/main.tscn"
 const RESTART_CYCLES := 20
 const TICKS_PER_CYCLE := 5
 
+## Rozmiar viewportu z project.godot i lewa krawedz slupka HUD z main.tscn.
+const VIEWPORT_WIDTH := 1280.0
+const VIEWPORT_HEIGHT := 800.0
+const HUD_COLUMN_LEFT := 620.0
+
 ## Indeksy wariantow incydentu (enum ScenarioVariant w simulation_runner.gd).
 const VARIANT_DETECTION := 0
 const VARIANT_SUCCESS := 1
@@ -543,6 +548,102 @@ func test_seek_to_end_reaches_terminal_outcome() -> void:
 	assert_int(_simulation_of(scene).get_tick()).is_equal(20)
 	assert_str(_simulation_of(scene).get_outcome()) \
 		.is_equal(SimulationState.OUTCOME_TICK_LIMIT)
+
+
+## Układ HUD musi mieścić się w viewporcie i nie może się nakładać.
+##
+## To jedyny test, który łapie wady widoczne wyłącznie na ekranie. Etykiety
+## rozpychają się ponad zdefiniowane offsety, gdy tekst jest szerszy albo wyższy
+## niż przewidziano, więc sam .tscn niczego nie gwarantuje. Stan po `seek_to_end`
+## jest najgorszym przypadkiem: najdłuższe teksty statusu i pełny panel zdarzeń.
+func test_hud_layout_fits_viewport_without_overlaps() -> void:
+	var runner := scene_runner(MAIN_SCENE)
+	await runner.simulate_frames(1)
+	var scene := runner.scene()
+	scene.call("seek_to_end")
+	await runner.simulate_frames(1)
+
+	var viewport := Rect2(Vector2.ZERO, Vector2(VIEWPORT_WIDTH, VIEWPORT_HEIGHT))
+	var hud := scene.get_node("HudLayer/Hud") as Control
+
+	var names: Array[String] = []
+	var rects: Array[Rect2] = []
+	for child in hud.get_children():
+		if child is Control:
+			var control := child as Control
+			names.append(String(control.name))
+			rects.append(Rect2(control.position, control.size))
+
+	assert_int(rects.size()) \
+		.append_failure_message("HUD nie ma kontrolek — test bylby pusty") \
+		.is_greater(10)
+
+	for i in rects.size():
+		assert_bool(viewport.encloses(rects[i])) \
+			.append_failure_message("%s wychodzi poza viewport: %s" % [names[i], str(rects[i])]) \
+			.is_true()
+
+	for i in rects.size():
+		for j in range(i + 1, rects.size()):
+			assert_bool(rects[i].intersects(rects[j])) \
+				.append_failure_message("%s naklada sie na %s: %s x %s" % [
+					names[i], names[j], str(rects[i]), str(rects[j])]) \
+				.is_false()
+
+
+## Plansza i oś czasu nie mogą na siebie wchodzić ani wjeżdżać w słupek HUD.
+func test_board_and_timeline_do_not_collide() -> void:
+	var runner := scene_runner(MAIN_SCENE)
+	await runner.simulate_frames(1)
+	var scene := runner.scene()
+
+	var board_size := float(LevelView.CELL_SIZE * 20)
+	var board := Rect2((scene.get_node("LevelL0") as Node2D).position,
+		Vector2(board_size, board_size))
+
+	var timeline := scene.get_node("Timeline") as TimelineView
+	var timeline_rect := Rect2(
+		timeline.position + Vector2(0.0, -TimelineView.HIT_PADDING),
+		Vector2(TimelineView.WIDTH, TimelineView.HEIGHT + TimelineView.HIT_PADDING * 2.0))
+
+	var viewport := Rect2(Vector2.ZERO, Vector2(VIEWPORT_WIDTH, VIEWPORT_HEIGHT))
+	assert_bool(viewport.encloses(board)).is_true()
+	assert_bool(viewport.encloses(timeline_rect)) \
+		.append_failure_message("os czasu wychodzi poza viewport: %s" % str(timeline_rect)) \
+		.is_true()
+	assert_bool(board.intersects(timeline_rect)) \
+		.append_failure_message("plansza naklada sie na os czasu") \
+		.is_false()
+
+	var hud_column := Rect2(Vector2(HUD_COLUMN_LEFT, 0.0),
+		Vector2(VIEWPORT_WIDTH - HUD_COLUMN_LEFT, VIEWPORT_HEIGHT))
+	assert_bool(board.intersects(hud_column)) \
+		.append_failure_message("plansza wjezdza w slupek HUD") \
+		.is_false()
+	assert_bool(timeline_rect.intersects(hud_column)) \
+		.append_failure_message("os czasu wjezdza w slupek HUD") \
+		.is_false()
+
+
+## Panele wyrównują kolumny spacjami, więc czcionka musi mieć stałą szerokość.
+func test_hud_panels_use_fixed_width_font() -> void:
+	var runner := scene_runner(MAIN_SCENE)
+	await runner.simulate_frames(1)
+	var scene := runner.scene()
+
+	for path: String in ["StatusLabel", "LegendLabel", "LogLabel"]:
+		var label := scene.get_node("HudLayer/Hud/%s" % path) as Label
+		var font := label.get_theme_font("font")
+		var font_size := label.get_theme_font_size("font")
+		var narrow := font.get_string_size(
+			"iiiiiiiiii", HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+		var wide := font.get_string_size(
+			"MMMMMMMMMM", HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+		assert_float(narrow) \
+			.append_failure_message(
+				"%s nie uzywa czcionki o stalej szerokosci: 'i'=%.1f 'M'=%.1f" % [
+					path, narrow, wide]) \
+			.is_equal_approx(wide, 0.5)
 
 
 ## Warstwa prezentacji nie może zawierać fizyki: żadnych ciał, obszarów,
