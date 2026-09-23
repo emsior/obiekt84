@@ -2,6 +2,23 @@
 
 Te zasady obowiązują w każdej kolejnej sesji pracy nad tym repozytorium.
 
+## Kontekst projektu (scalone z `D:\obiekt84\CLAUDE.md`, 23.09.2026)
+
+- **To repo jest jedynym źródłem prawdy gry:** `E:\OBJEKT\obiekt84`. Stara linia z `D:\obiekt84` (2 commity, własny runner, `sim/`) leży w `D:\_archive\obiekt84_old_v0` — **nie pracować tam, nie scalać stamtąd kodu**.
+- Repo zdalne: `github.com/emsior/obiekt84` (publiczne po pierwszym pushu). Push wyłącznie skryptem `D:\_archive\OBIEKT84_SYNC_I_PUSH.ps1`, uruchamianym ręcznie przez właściciela.
+- **To 8-tygodniowy test komercyjno-projektowy, nie projekt bez końca.** Bramka GO/KILL: **16.11.2026**. Plan: `PLAN_OBIEKT84_od-konca_v0.md` (projekt „PROCH PC company" / `workspace\Claude outputs\`).
+- Priorytet dochodowy właściciela to DaaS Engine (`D:\daas-engine`). Gra jest **drugim torem**. Nie proponuj przenoszenia czasu z DaaS tutaj.
+- Stos: **Godot 4.7.2** (`C:\Users\proch\Desktop\Godot_v4.7.2-stable_win64_console.exe`), GDScript, **GdUnit4 6.2.1**. Baza testów 23.09: **107/107** (6 suit, headless).
+- Testy z terminala:
+  `godot --headless --path . -s -d res://addons/gdUnit4/bin/GdUnitCmdTool.gd -a res://tests --ignoreHeadlessMode -c`
+
+## Marka i OPSEC
+
+- 🚫 **Zakaz nazwiska właściciela** w kodzie, commitach, README i dokumentach. Marka: **Proch PC / PPC**.
+- Kontakt i tożsamość gita: **`prochpc@gmail.com`**. Starego prywatnego adresu nie używamy w nowych treściach ani commitach. Historia sprzed 23.09 zostaje bez zmian (decyzja właściciela).
+- 🚫 Zero słownictwa hazardowego (art. 110a k.k.s.).
+- Git w tym repo: `user.name = PPC`, `user.email = prochpc@gmail.com`.
+
 ## Priorytet
 
 Priorytetem jest **działający i deterministyczny L0**, nie architektura pod przyszłe poziomy.
