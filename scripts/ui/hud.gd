@@ -166,15 +166,16 @@ func render(snapshot: Dictionary, events: Array[Dictionary], ui_state: Dictionar
 
 
 ## Panel statusu, legenda i event log wyrównują kolumny spacjami, więc wymagają
-## czcionki o stałej szerokości. `SystemFont` bierze rodzinę z systemu — nie jest
-## to zewnętrzny asset i nic nie trafia do repozytorium. Gdy system nie ma żadnej
-## z wymienionych rodzin, Godot cofa się do czcionki domyślnej.
+## czcionki o stałej szerokości. Czcionka jest dołączona do repozytorium
+## (`assets/fonts`, licencja w `LICENSE_DejaVu.txt`), bo `SystemFont` nie działa
+## w eksporcie Web ani w kontenerze CI — tam cofał się do czcionki proporcjonalnej
+## i kolumny się rozjeżdżały. Decyzja: `docs/DECISIONS.md`, 2026-09-23.
+const MONOSPACE_FONT: Font = preload("res://assets/fonts/DejaVuSansMono.ttf")
+
+
 func _apply_monospace_font() -> void:
-	var font := SystemFont.new()
-	font.font_names = PackedStringArray([
-		"monospace", "Consolas", "DejaVu Sans Mono", "Courier New"])
 	for label: Label in [_status_label, _legend_label, _log_label]:
-		label.add_theme_font_override("font", font)
+		label.add_theme_font_override("font", MONOSPACE_FONT)
 	_log_label.add_theme_font_size_override("font_size", LOG_FONT_SIZE)
 
 	_outcome_label.add_theme_font_size_override("font_size", OUTCOME_FONT_SIZE)

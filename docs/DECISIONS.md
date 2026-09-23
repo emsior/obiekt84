@@ -209,3 +209,13 @@ Format wpisu: data, decyzja, uzasadnienie, konsekwencje.
 **Konsekwencje — i to jest istotne:** determinizm przestał być wyłącznie właściwością testów, a stał się **warunkiem poprawności funkcji, której używa człowiek**. Gdyby rdzeń przestał być deterministyczny, przewijanie zaczęłoby pokazywać inny przebieg niż ten, który tester przed chwilą oglądał — i byłoby to widoczne gołym okiem, bez patrzenia w testy. Testy 50/50 i golden logi pozostają pierwszą linią obrony, ale przewijanie jest teraz drugą, działającą w czasie rzeczywistym.
 
 Praktyczna konsekwencja dla przyszłych zmian: **każde wprowadzenie stanu, który nie wynika z danych scenariusza i liczby wywołań `step()`, złamie przewijanie.** Dotyczy to w szczególności jakiejkolwiek losowości, zależności od czasu systemowego i trzymania stanu w node'ach. Zakazy z `CLAUDE.md` mają więc od teraz widoczny objaw naruszenia, nie tylko czerwony test.
+
+---
+
+## 2026-09-23 — Czcionki DejaVu dołączone do repozytorium zamiast `SystemFont`
+
+**Decyzja:** w `assets/fonts/` leżą dwie niezmodyfikowane czcionki DejaVu (licencja Bitstream Vera, `assets/fonts/LICENSE_DejaVu.txt`): `DejaVuSansMono.ttf` dla panelu statusu, legendy i event logu (`hud.gd`, `MONOSPACE_FONT`) oraz `DejaVuSans.ttf` jako domyślna czcionka projektu (`gui/theme/custom_font`). Decyzję zatwierdził właściciel („ok czcionka”), bo zasady repo zabraniają dodawania assetów bez decyzji.
+
+**Uzasadnienie:** `SystemFont` działał tylko na desktopie z zainstalowaną czcionką monospace. W eksporcie Web (GitHub Pages) i w kontenerze CI Godot cofał się do czcionki proporcjonalnej. Skutki: 6 testów układu HUD czerwonych wyłącznie w CI, nachodzące na siebie wiersze legendy i logu w przeglądarce oraz puste kwadraty zamiast znaczników `●`, `○`, `►`. Domyślna czcionka Godota nie ma tych znaków, a w przeglądarce nie ma systemowego fallbacku. Obie czcionki DejaVu je mają.
+
+**Konsekwencje:** wygląd jest identyczny na Windows, w CI i w przeglądarce. Build Web rośnie o ok. 1,1 MB (przy 39 MB wasm). Krok instalujący fontconfig w CI został usunięty, bo testy nie zależą już od systemu.
