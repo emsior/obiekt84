@@ -31,6 +31,13 @@ jobs:
         run: |
           if grep -rInE --exclude-dir=.git --exclude-dir=addons "mcq089[@]|bettin[g]|bukmache[r]" . ; then
             echo "::error::zakazana fraza w repo"; exit 1; fi
+      - name: Czcionka monospace w kontenerze
+        # HUD bierze SystemFont "monospace" (hud.gd, _apply_monospace_font). Obraz godot-ci nie ma
+        # fontconfig ani zadnej czcionki, wiec bez tego testy ukladu HUD padaja tylko w CI.
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends fontconfig fonts-dejavu-core
+          fc-match monospace
       - name: Import (cache class_name)
         run: godot --headless --path . --import || true
       - name: Testy GdUnit4
