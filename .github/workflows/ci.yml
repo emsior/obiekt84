@@ -1,0 +1,86 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request: # nigdy pull_request_target
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: 4.7.2
+
+# Akcje przypiete do SHA, obraz do digestu (tag w komentarzu). Aktualizuje Dependabot.
+jobs:
+  test:
+    name: GdUnit4 (headless)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container:
+      image: barichello/godot-ci@sha256:cdcca31e9194fd59a68a63f4b1b9c3981716819c520cd6f7966c5d72ca7246bd # 4.7.2
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - name: OPSEC grep
+        run: |
+          if grep -rInE --exclude-dir=.git --exclude-dir=addons "mcq089[@]|bettin[g]|bukmache[r]" . ; then
+            echo "::error::zakazana fraza w repo"; exit 1; fi
+      - name: Czcionka monospace w kontenerze
+        # HUD bierze SystemFont "monospace" (hud.gd, _apply_monospace_font). Obraz godot-ci nie ma
+        # fontconfig ani zadnej czcionki, wiec bez tego testy ukladu HUD padaja tylko w CI.
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends fontconfig fonts-dejavu-core
+          fc-match monospace
+      - name: Import (cache class_name)
+        run: godot --headless --path . --import || true
+      - name: Testy GdUnit4
+        run: godot --headless --path . -s -d res://addons/gdUnit4/bin/GdUnitCmdTool.gd -a res://tests --ignoreHeadlessMode -c
+
+  export-web:
+    name: Export Web
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: test
+    container:
+      image: barichello/godot-ci@sha256:cdcca31e9194fd59a68a63f4b1b9c3981716819c520cd6f7966c5d72ca7246bd # 4.7.2
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - name: Szablony eksportu
+        run: |
+          mkdir -p ~/.local/share/godot/export_templates
+          mv /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+      - name: Import
+        run: godot --headless --path . --import || true
+      - name: Eksport HTML5
+        run: |
+          mkdir -p build/web
+          godot --headless --path . --export-release "Web" build/web/index.html
+          test -f build/web/index.html
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: build/web
+
+  deploy-pages:
+    name: GitHub Pages
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: export-web
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
