@@ -116,7 +116,7 @@ $env:GODOT_BIN = 'C:\sciezka\do\Godot_v4.7.2-stable_win64_console.exe'
 "%GODOT_BIN%" --headless --path . -s res://addons/gdUnit4/bin/GdUnitCmdTool.gd -a tests --ignoreHeadlessMode
 ```
 
-Wynik ostatniego uruchomienia: **92 przypadki testowe, 0 błędów, 0 failures, 0 flaky, 0 skipped, 0 orphans, exit code 0.**
+Wynik ostatniego uruchomienia: **107 przypadków testowych, 0 błędów, 0 failures, 0 flaky, 0 skipped, 0 orphans, exit code 0.**
 
 Flaga `--ignoreHeadlessMode` jest wymagana, ponieważ GdUnit4 domyślnie odmawia pracy w trybie headless. Nasze testy nie używają `InputEvent`, więc to ograniczenie ich nie dotyczy.
 
@@ -126,7 +126,7 @@ Flaga `--ignoreHeadlessMode` jest wymagana, ponieważ GdUnit4 domyślnie odmawia
 call addons\gdUnit4\runtest.cmd -a tests
 ```
 
-Exit code 0, 92/92 przypadków. Uwaga: `runtest.cmd` uruchamia właściwy przebieg **w trybie okienkowym**, nie headless, i w tym repozytorium działa poprawnie wyłącznie wywołany z CMD lub PowerShell. Wywołany przez Git Bash zawiesza się bez wypisania czegokolwiek. Do CI używaj komendy podstawowej.
+Ostatnia potwierdzona weryfikacja tej komendy: exit code 0, **92/92** — sprzed dodania suity `tests/test_scenario.gd`. Liczby nie przepisujemy bez ponownego uruchomienia; komenda podstawowa jest zweryfikowana na pełnym, bieżącym zestawie. Uwaga: `runtest.cmd` uruchamia właściwy przebieg **w trybie okienkowym**, nie headless, i w tym repozytorium działa poprawnie wyłącznie wywołany z CMD lub PowerShell. Wywołany przez Git Bash zawiesza się bez wypisania czegokolwiek. Do CI używaj komendy podstawowej.
 
 Raporty XML i HTML lądują w `reports/` (katalog ignorowany przez Git).
 
@@ -160,6 +160,21 @@ razem ze zmianą testów i wpisem w `docs/DECISIONS.md`. Test nigdy ich nie nadp
 Czerwonego testu golden log **nie wolno "naprawiać" przez regenerację fixture'u**:
 najpierw ustal, czy zmiana zachowania była zamierzona.
 
+### Walidacja danych scenariusza
+
+`tests/test_scenario.gd` pilnuje dwóch rzeczy, których nie widać w samym przebiegu incydentu:
+
+- **`ScenarioL0.validate()` zgłasza błędne dane wejściowe** — waypoint albo trasę poza siatką,
+  dziurę lub skos w trasie, niekardynalny kierunek patrzenia, ujemny zasięg, zerowy `max_ticks`.
+  Zwraca **wszystkie** problemy naraz, nie tylko pierwszy. `Simulation.initialize()` zatrzymuje
+  się na niepoprawnych danych jawnym komunikatem, zamiast uruchamiać bezwartościowy przebieg.
+- **`ScenarioL0.duplicate_data()` kopiuje każde pole.** Test przechodzi po właściwościach klasy
+  przez refleksję, więc nowe pole, którego ktoś zapomni dopisać do kopii, zapala test — zamiast
+  po cichu przeciekać między przebiegami i psuć determinizm. Niezależność tablic sprawdzona osobno.
+
+Czułość drugiego testu jest potwierdzona: tymczasowe pole pominięte w `duplicate_data()` zapala go
+z komunikatem wskazującym nazwę pola.
+
 ## Zakres L0
 
 - Siatka logiczna 20 × 20, trzymana w pamięci, a nie jako 400 node'ów.
@@ -177,7 +192,7 @@ Bieżący incydent kończy się w 38 ticku wykryciem intruza przez strażnika, t
 
 - **Konfiguracja incydentu jest definiowana w danych scenariusza** (`scripts/core/scenario_l0.gd`), a **nie przez interaktywne UI planowania.** Nie ma edytora ustawiania kamer ani waypointów — to celowa decyzja, nie brak.
 - Brak pathfindingu: intruz ma kompletną listę komórek, strażnik chodzi regułą „najpierw oś X, potem oś Y". Żadnego AStar, NavMesh ani `NavigationAgent2D`.
-- Brak okluzji ścian i algorytmu linii widzenia — FOV to czysty test stożka.
+- Brak ścian i pól zablokowanych: w danych scenariusza nie istnieje takie pojęcie, więc nie ma też okluzji ani algorytmu linii widzenia — FOV to czysty test stożka.
 - Brak dźwięku, animacji, shaderów, zapisu, ekonomii, metaprogresji i generowania proceduralnego.
 - Strażnik w stanie `SUSPICION` stoi w miejscu, więc `RETURN` trwa zwykle jeden tick. Przejazd powrotny jest pokryty osobnym testem FSM.
 - Placeholdery wizualne przeskakują między komórkami. Interpolacja byłaby czysto kosmetyczna.

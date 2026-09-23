@@ -33,9 +33,9 @@ Każdy z poniższych punktów oznacza, że L0 nie jest gotowy:
 - reset nieodtwarzający stanu początkowego;
 - konieczność ręcznego klikania, żeby wykonać testy rdzenia.
 
-## Stan bieżący (2026-09-22)
+## Stan bieżący (2026-09-23)
 
-Zestaw testów: **92 przypadki, 0 błędów, 0 failures, 0 flaky, 0 skipped, 0 orphans, exit code 0.**
+Zestaw testów: **107 przypadków, 0 błędów, 0 failures, 0 flaky, 0 skipped, 0 orphans, exit code 0.**
 
 Trzy terminalne zakończenia silnika, wszystkie dostępne z UI i wszystkie pokryte golden fixture'em:
 

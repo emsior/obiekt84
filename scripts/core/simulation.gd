@@ -37,7 +37,13 @@ var _pending_events: Array[Dictionary] = []
 ## Przygotowuje rdzeń na podstawie jawnych danych scenariusza.
 ## Przechowywana jest niezależna kopia — późniejsza zmiana przekazanego
 ## obiektu nie może wpłynąć na przebieg.
+##
+## Niepoprawne dane scenariusza zatrzymują się tutaj z jawnym komunikatem.
+## Rdzeń nie naprawia takich danych po cichu — przebieg na trasie z dziurą
+## albo z waypointem poza siatką byłby deterministyczny, lecz bezwartościowy.
 func initialize(scenario: ScenarioL0) -> void:
+	var problems := scenario.validate()
+	assert(problems.is_empty(), "niepoprawne dane scenariusza: %s" % "; ".join(problems))
 	_scenario = scenario.duplicate_data()
 	_state = SimulationState.new(_scenario)
 	_event_log = EventLog.new()

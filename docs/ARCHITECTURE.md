@@ -69,6 +69,25 @@ Siatka 20 × 20 to para liczb w `Grid`, nie 400 node'ów.
 
 Żadnego AStar, NavMesh ani `NavigationAgent2D`.
 
+## Walidacja danych scenariusza
+
+Rdzeń przyjmuje scenariusz jako jawne dane i **nigdy ich nie naprawia**. Bez pathfindingu i bez
+korekty błędne dane dałyby przebieg nadal deterministyczny, lecz pozbawiony sensu: strażnik szedłby
+do waypointu poza siatką, intruz przeskakiwałby komórki.
+
+`ScenarioL0.validate()` zwraca listę problemów — pusta lista oznacza dane poprawne.
+
+| Reguła | Dlaczego |
+|---|---|
+| dodatnie wymiary siatki | bez nich kontrola granic nie ma o co pytać |
+| pozycje startowe, waypointy i cała trasa wewnątrz siatki | `Grid.is_inside` jest jedyną definicją granicy |
+| kierunki patrzenia kardynalne | FOV zakłada dokładnie jedną oś |
+| kolejne komórki trasy różnią się o jedną komórkę w osi | kontrakt „najwyżej jeden krok na tick" |
+| nieujemne zasięgi widzenia, dodatni `max_ticks` | inaczej przebieg nie miałby końca albo FOV sensu |
+
+Walidacja zbiera **wszystkie** problemy naraz. `Simulation.initialize()` zatrzymuje się na
+niepoprawnych danych, zamiast uruchamiać bezwartościowy przebieg. Pokrycie: `tests/test_scenario.gd`.
+
 ## Matematyczne FOV
 
 ```gdscript

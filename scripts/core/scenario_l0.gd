@@ -95,3 +95,73 @@ static func _build_route(corners: Array[Vector2i]) -> Array[Vector2i]:
 			from.y += signi(to.y - from.y)
 			route.append(from)
 	return route
+
+
+## Lista problemów w danych scenariusza. Pusta lista oznacza dane poprawne.
+##
+## Rdzeń nie ma pathfindingu i nie koryguje błędnych danych. Gdyby waypoint
+## wypadł poza siatkę albo trasa przeskakiwała komórkę, przebieg nadal byłby
+## deterministyczny — tylko bez sensu. Walidacja zamienia taki błąd w jawny
+## komunikat, zamiast cichego dziwnego przebiegu.
+func validate() -> Array[String]:
+	var problems: Array[String] = []
+
+	if grid_width < 1 or grid_height < 1:
+		problems.append("grid_size=%d,%d: wymiary siatki muszą być dodatnie" % [
+			grid_width, grid_height])
+		# Bez poprawnych wymiarów dalsze kontrole granic nie mają sensu.
+		return problems
+
+	var grid := Grid.new(grid_width, grid_height)
+
+	if not grid.is_inside(guard_start):
+		problems.append("guard_start=%s poza siatką" % _cell_text(guard_start))
+	if not _is_cardinal(guard_facing):
+		problems.append("guard_facing=%s nie jest kierunkiem kardynalnym" % _cell_text(guard_facing))
+	if guard_view_range < 0:
+		problems.append("guard_view_range=%d jest ujemny" % guard_view_range)
+
+	if guard_waypoints.is_empty():
+		problems.append("guard_waypoints: pusta lista — strażnik nie miałby dokąd iść")
+	for i in guard_waypoints.size():
+		if not grid.is_inside(guard_waypoints[i]):
+			problems.append("guard_waypoints[%d]=%s poza siatką" % [
+				i, _cell_text(guard_waypoints[i])])
+
+	if intruder_route.is_empty():
+		problems.append("intruder_route: pusta trasa — intruz nie miałby pozycji startowej")
+	for i in intruder_route.size():
+		if not grid.is_inside(intruder_route[i]):
+			problems.append("intruder_route[%d]=%s poza siatką" % [
+				i, _cell_text(intruder_route[i])])
+	# Kontrakt ruchu: najwyżej jedna komórka na tick, wyłącznie w osi.
+	for i in range(1, intruder_route.size()):
+		var step: Vector2i = intruder_route[i] - intruder_route[i - 1]
+		if not _is_cardinal(step):
+			problems.append("intruder_route[%d]: krok %s to nie jedna komórka w osi" % [
+				i, _cell_text(step)])
+
+	if not grid.is_inside(camera_position):
+		problems.append("camera_position=%s poza siatką" % _cell_text(camera_position))
+	if not _is_cardinal(camera_facing):
+		problems.append("camera_facing=%s nie jest kierunkiem kardynalnym" % _cell_text(camera_facing))
+	if camera_range < 0:
+		problems.append("camera_range=%d jest ujemny" % camera_range)
+
+	if max_ticks < 1:
+		problems.append("max_ticks=%d musi być dodatnie" % max_ticks)
+
+	return problems
+
+
+func is_valid() -> bool:
+	return validate().is_empty()
+
+
+## Kierunek kardynalny: dokładnie jedna oś, dokładnie o jedną komórkę.
+static func _is_cardinal(value: Vector2i) -> bool:
+	return absi(value.x) + absi(value.y) == 1
+
+
+static func _cell_text(cell: Vector2i) -> String:
+	return "(%d,%d)" % [cell.x, cell.y]
