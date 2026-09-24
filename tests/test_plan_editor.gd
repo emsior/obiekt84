@@ -17,11 +17,13 @@ const PHASE_RUN := 1
 
 ## Komórki planu domyślnego (`ScenarioL0.create_puzzle()`).
 const PUZZLE_CAMERA := Vector2i(3, 3)
-const PUZZLE_WAYPOINT_2 := Vector2i(16, 8)
+const PUZZLE_WAYPOINT_2 := Vector2i(16, 7)
 
-## Plan referencyjny z `tests/test_l0_golden_log.gd`: kamera przy celu intruza.
-const SOLUTION_CAMERA_POSITION := Vector2i(17, 9)
-const SOLUTION_TERMINAL_TICK := 36
+## Plan referencyjny z `tests/test_l0_golden_log.gd`: węzeł 3 o wiersz niżej
+## i kamera nad korytarzem. Każda z tych zmian osobno przegrywa (L1-C).
+const SOLUTION_WAYPOINT_2 := Vector2i(16, 8)
+const SOLUTION_CAMERA_POSITION := Vector2i(12, 9)
+const SOLUTION_TERMINAL_TICK := 32
 
 
 func _new_editor() -> PlanEditor:
@@ -366,8 +368,9 @@ func test_rejected_edit_shows_message_until_timer_expires() -> void:
 	assert_that(subtitle.get_theme_color("font_color")).is_equal(Hud.COLOR_SUBTITLE)
 
 
-## Pełna pętla gry: plan domyślny przegrywa, gracz przenosi kamerę w edytorze
-## i ta sama noc kończy się obroną obiektu.
+## Pełna pętla gry: plan domyślny przegrywa; sama kamera przeniesiona nad
+## korytarz nadal przegrywa, bo kamera tylko namierza; dopiero wydłużony patrol
+## razem z kamerą kończy noc obroną obiektu (L1-C).
 func test_player_can_turn_loss_into_win_through_editor() -> void:
 	var runner := scene_runner(MAIN_SCENE)
 	await runner.simulate_frames(1)
@@ -382,6 +385,15 @@ func test_player_can_turn_loss_into_win_through_editor() -> void:
 
 	scene.call("return_to_plan")
 	assert_bool(_drag(editor, PUZZLE_CAMERA, SOLUTION_CAMERA_POSITION)).is_true()
+	scene.call("start_run")
+	scene.call("seek_to_end")
+	assert_str(_simulation_of(scene).get_outcome()) \
+		.append_failure_message("sama kamera nie powinna wygrywac") \
+		.is_equal(SimulationState.OUTCOME_INTRUDER_SUCCESS)
+	assert_str(outcome.text).contains("DANE WYKRADZIONE")
+
+	scene.call("return_to_plan")
+	assert_bool(_drag(editor, PUZZLE_WAYPOINT_2, SOLUTION_WAYPOINT_2)).is_true()
 	scene.call("start_run")
 	scene.call("seek_to_end")
 

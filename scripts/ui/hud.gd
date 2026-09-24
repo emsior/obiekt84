@@ -198,6 +198,7 @@ func _plan_status_text(snapshot: Dictionary, ui_state: Dictionary) -> String:
 			route.size(),
 			_cell_text(route[route.size() - 1]),
 		],
+		"zasada:    kamera namierza — strażnik zatrzymuje",
 		"limit:     %d ticków   (10 Hz)" % int(snapshot["max_ticks"]),
 		"tempo:     %s   [%s]" % [
 			_speed_text(float(ui_state["speed_multiplier"])),
@@ -231,11 +232,12 @@ func _run_status_text(
 			int(snapshot["guard_visible_streak"]),
 			int(snapshot["guard_view_range"]),
 		],
-		"intruz:    %-9s %s  krok=%d/%d" % [
+		"intruz:    %-9s %s  krok=%d/%d%s" % [
 			String(snapshot["intruder_state"]),
 			_cell_text(snapshot["intruder_position"]),
 			int(snapshot["intruder_route_index"]),
 			(snapshot["intruder_route"] as Array).size() - 1,
+			"  NAMIERZONY" if bool(snapshot["intruder_marked"]) else "",
 		],
 		"kamera:    %-9s %s  zasięg=%d" % [
 			"STATIC",

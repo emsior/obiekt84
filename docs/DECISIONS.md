@@ -246,3 +246,37 @@ Zmiany w rdzeniu, wyłącznie addytywne:
 - Dwa nowe, świadomie dodane fixture'y: `tests/fixtures/l0_puzzle_default_golden_log.txt` (plan domyślny → `INTRUDER_SUCCESS`, tick 40) i `tests/fixtures/l0_puzzle_solution_golden_log.txt` (jawnie zapisany plan referencyjny: patrol zagadki + kamera `(17,9)` skierowana w dół → `INTRUDER_DETECTED` przez kamerę, tick 36). Drugi jest pierwszym golden logiem dla powodu `camera_detection`. Oba wygenerował prawdziwy silnik i oba zgadzają się z niezależną repliką reguł policzoną przed implementacją.
 - Poza zakresem pozostają: ściany, LOS, pathfinding, zmienna liczba waypointów, edycja trasy intruza i zasięgów, limit czasu na planowanie, strefy behawioralne i zapis planu.
 - Dwie poprawki sceny, bez których edytora nie da się obsłużyć myszą: korzeń HUD ma `mouse_filter = IGNORE` (pełnoekranowy `Control` zjadał kliknięcia przed `_unhandled_input`), a przyciski HUD mają `focus_mode = NONE` (po kliknięciu przycisku Spacja trafiała do przycisku z fokusem zamiast do koordynatora). **Uzupełnienie L1-B:** tych dwóch poprawek nie wystarczyło. Pełnoekranowe tło `Background` (`ColorRect` 1280 × 800, domyślnie `mouse_filter = STOP`) też zjadało kliknięcia na planszy i osi czasu. Ujawnił to dopiero test buildu Web prawdziwą myszą, bo testy wołały `_unhandled_input` wprost. Poprawka: `mouse_filter = IGNORE` na `Background`. Pilnuje jej `test_main_scene.gd::test_board_mouse_input_reaches_runner_through_viewport`, który wysyła zdarzenia przez `Viewport.push_input`.
+
+---
+
+## 2026-09-24 — Kamera namierza, strażnik zatrzymuje (L1-C)
+
+**Decyzja:** kamera przestaje wykrywać intruza. Gdy pierwszy raz go zobaczy, intruz staje się **namierzony** (`IntruderScript.marked`, jeden wpis `camera_01|MARKED|intruder_in_camera_fov`). Wykrywa wyłącznie strażnik: przy namierzonym intruzie do alarmu wystarcza mu **jeden** tick widoczności zamiast dwóch — pierwsza obserwacja daje w tym samym ticku `SUSPICION`, a zaraz po nim `ALARM` z powodem `intruder_marked_by_camera`. Patrol zagadki (`ScenarioL0.create_puzzle()`) to teraz `(10,4) (16,4) (16,7) (10,7)`. Wariant W3b wybrał użytkownik po studium L1-C; plan zatwierdził C z warunkami.
+
+**Uzasadnienie — studium L1-C.** Przy regule L1-A kamera i strażnik były niezależnymi detektorami: każda wygrana była albo wygraną samej kamery, albo samego patrolu. Liczby dla patrolu L1-A:
+
+| Pomiar | Wynik | Źródło |
+|---|---|---|
+| sama kamera, patrol domyślny | 613 / 1420 ustawień (43,2%) | studium: replika + silnik w kopii repo |
+| pojedyncze przesunięcie węzła, kamera domyślna | 585 / 1592 (36,7%) | studium: replika + silnik |
+| pary węzeł × kamera wymagające obu | 0 / 2 261 344 | studium: replika, dekompozycja zweryfikowana silnikiem na próbce |
+
+Dane bez zmiany reguły tego nie naprawią: krótszy zasięg kamery nadal daje wygrane samej kamery (zasięg 1: 81 / 1420, silnik), a stałe punkty montażu albo zostawiają wygrane kamery (4 punkty przy korytarzu: 8 / 16, silnik), albo odbierają kamerze jakąkolwiek rolę (4 punkty bez widoku trasy: 0 / 16, silnik). Po zmianie reguły i patrolu:
+
+| Pomiar | Wynik | Źródło |
+|---|---|---|
+| sama kamera, patrol domyślny | **0 / 1420** | test `tests/test_puzzle_design.gd::test_camera_alone_never_wins_with_default_patrol` (silnik, wyczerpująco) |
+| pojedyncze przesunięcie węzła, kamera domyślna | 537 / 1592 (33,7%) | studium: replika + silnik |
+| pary węzeł × kamera, wygrane | 875 427 / 2 261 344 (38,7%) | studium: replika |
+| w tym wymagające obu | 112 507 (12,9% wygranych) | studium: replika, próbka 500 par potwierdzona silnikiem |
+
+Łącznie w studium silnik policzył 19 412 przypadków i zgodził się z repliką w każdym. Plan referencyjny — węzeł 3 na `(16,8)`, kamera `(12,9)` w dół — wygrywa w 32 ticku, a każda jego połowa osobno przegrywa (`test_reference_solution_requires_both_patrol_and_camera`).
+
+**Konsekwencje:**
+
+- Zastępuje regułę z 2026-09-21 („przy równoczesnym wykryciu priorytet ma kamera”): powód wykrycia jest jeden — `guard_alarm`. Stała `Simulation.REASON_CAMERA` zniknęła. Kolejność faz ticka się nie zmienia; zmienia się znaczenie fazy 4.
+- Tabela `GuardFsm.ALLOWED_TRANSITIONS` i `ALARM_STREAK = 2` bez zmian — przy namierzeniu strażnik nadal przechodzi przez `SUSPICION`.
+- `intruder_marked` jest w `to_snapshot()` (HUD pokazuje `NAMIERZONY`), ale **nie** w `to_canonical()` — nowe pole kanoniczne zmieniłoby `[FINAL_STATE]` wszystkich zatwierdzonych golden logów. Namierzenie wynika jednoznacznie z wpisu `MARKED` w logu; pilnuje tego `test_simulation.gd::test_intruder_marked_matches_single_marked_log_entry`.
+- **Trzy golden logi L0 bez zmian** (diff pusty): w przebiegach `ScenarioL0.create()` kamera `(3,3)` patrzy w dół z zasięgiem 5 i nie sięga trasy intruza (najmniejsze y = 12), więc nikt nie jest namierzany.
+- **Oba golden logi zagadki świadomie wymienione** (ta sama nazwa plików, nowa treść, wygenerowane silnikiem skryptem spoza repo i porównane ze studium): `l0_puzzle_default_golden_log.txt` — strażnik w ogóle nie widzi intruza, `INTRUDER_SUCCESS` w 40 ticku; `l0_puzzle_solution_golden_log.txt` — `MARKED` w 31, `SUSPICION` + `ALARM` w 32, `INTRUDER_DETECTED` przez `guard_alarm` w 32. Zastępuje to dane zagadki i rozwiązanie z wpisu L1-A powyżej.
+- W istniejących testach zmieniły się wyłącznie dane zagadki (węzeł, ticki, powód, nazwa testu rozwiązania); na HEAD `16b6f88` z nową regułą czerwieniało 21 testów, plus 2 testy planu domyślnego zależne od fixture'u. Żaden test ścieżki bez namierzenia nie został osłabiony.

@@ -101,8 +101,14 @@ func move_step() -> int:
 
 ## Faza aktualizacji FSM. Zwraca listę przejść w stabilnej kolejności;
 ## każde przejście to {"from": String, "to": String, "reason": String}.
-func update_state(sees_intruder: bool) -> Array[Dictionary]:
+##
+## [param intruder_marked]: intruz namierzony wcześniej przez kamerę. Wtedy do
+## alarmu wystarcza jeden tick widoczności — pierwsza obserwacja daje w tym samym
+## ticku `SUSPICION`, a zaraz po nim `ALARM`. Strażnik nadal przechodzi przez
+## `SUSPICION`, więc tabela dozwolonych przejść się nie zmienia.
+func update_state(sees_intruder: bool, intruder_marked := false) -> Array[Dictionary]:
 	var transitions: Array[Dictionary] = []
+	var alarm_streak := 1 if intruder_marked else ALARM_STREAK
 
 	match state:
 		STATE_PATROL:
@@ -110,11 +116,11 @@ func update_state(sees_intruder: bool) -> Array[Dictionary]:
 				visible_streak = 1
 				resume_point = position
 				transitions.append(_transition(STATE_SUSPICION, "intruder_visible"))
+				_escalate_if_confirmed(transitions, alarm_streak)
 		STATE_SUSPICION:
 			if sees_intruder:
 				visible_streak += 1
-				if visible_streak >= ALARM_STREAK:
-					transitions.append(_transition(STATE_ALARM, "intruder_visible_consecutive_ticks"))
+				_escalate_if_confirmed(transitions, alarm_streak)
 			else:
 				visible_streak = 0
 				transitions.append(_transition(STATE_RETURN, "target_lost"))
@@ -123,12 +129,23 @@ func update_state(sees_intruder: bool) -> Array[Dictionary]:
 				visible_streak = 1
 				resume_point = position
 				transitions.append(_transition(STATE_SUSPICION, "intruder_reacquired"))
+				_escalate_if_confirmed(transitions, alarm_streak)
 			elif position == resume_point:
 				transitions.append(_transition(STATE_PATROL, "resume_point_reached"))
 		STATE_ALARM:
 			pass
 
 	return transitions
+
+
+## `SUSPICION → ALARM`, gdy strażnik widzi intruza wystarczająco długo. Powód
+## mówi, co przeważyło: dwa kolejne ticki widoczności albo namierzenie z kamery.
+func _escalate_if_confirmed(transitions: Array[Dictionary], alarm_streak: int) -> void:
+	if visible_streak < alarm_streak:
+		return
+	var reason := "intruder_visible_consecutive_ticks" if visible_streak >= ALARM_STREAK \
+		else "intruder_marked_by_camera"
+	transitions.append(_transition(STATE_ALARM, reason))
 
 
 ## Ruch o najwyżej jedną komórkę: najpierw oś X, potem oś Y.

@@ -201,3 +201,80 @@ func test_no_illegal_transition_occurs_in_any_observation_sequence() -> void:
 			assert_array(GuardFsm.ALL_STATES) \
 				.append_failure_message("stan %s spoza zbioru stanow" % guard.state) \
 				.contains([guard.state])
+
+
+# === namierzenie przez kamerę (L1-C) ==========================================
+
+## Namierzony intruz: pierwsza obserwacja z PATROL daje w tym samym ticku
+## SUSPICION, a zaraz po nim ALARM. Strażnik nie przeskakuje SUSPICION.
+func test_marked_intruder_first_sighting_raises_alarm_through_suspicion() -> void:
+	var guard := _make_guard()
+	var transitions := guard.update_state(true, true)
+
+	assert_int(transitions.size()).is_equal(2)
+	assert_str(String(transitions[0]["from"])).is_equal(GuardFsm.STATE_PATROL)
+	assert_str(String(transitions[0]["to"])).is_equal(GuardFsm.STATE_SUSPICION)
+	assert_str(String(transitions[0]["reason"])).is_equal("intruder_visible")
+	assert_str(String(transitions[1]["from"])).is_equal(GuardFsm.STATE_SUSPICION)
+	assert_str(String(transitions[1]["to"])).is_equal(GuardFsm.STATE_ALARM)
+	assert_str(String(transitions[1]["reason"])).is_equal("intruder_marked_by_camera")
+	assert_int(guard.visible_streak).is_equal(1)
+	assert_bool(guard.is_terminal()).is_true()
+
+
+## Ponowne dostrzeżenie w RETURN przy namierzonym intruzie też kończy się alarmem.
+func test_marked_intruder_reacquired_from_return_raises_alarm() -> void:
+	var guard := _make_guard()
+	guard.update_state(true)
+	guard.update_state(false)
+	assert_str(guard.state).is_equal(GuardFsm.STATE_RETURN)
+
+	var transitions := guard.update_state(true, true)
+	assert_int(transitions.size()).is_equal(2)
+	assert_str(String(transitions[0]["to"])).is_equal(GuardFsm.STATE_SUSPICION)
+	assert_str(String(transitions[0]["reason"])).is_equal("intruder_reacquired")
+	assert_str(String(transitions[1]["to"])).is_equal(GuardFsm.STATE_ALARM)
+	assert_str(String(transitions[1]["reason"])).is_equal("intruder_marked_by_camera")
+
+
+## Drugi kolejny tick widoczności to alarm z dotychczasowym powodem — także
+## wtedy, gdy intruz został namierzony w międzyczasie.
+func test_second_consecutive_sighting_keeps_consecutive_reason_when_marked() -> void:
+	var guard := _make_guard()
+	guard.update_state(true)
+	var transitions := guard.update_state(true, true)
+
+	assert_int(transitions.size()).is_equal(1)
+	assert_str(String(transitions[0]["to"])).is_equal(GuardFsm.STATE_ALARM)
+	assert_str(String(transitions[0]["reason"])).is_equal("intruder_visible_consecutive_ticks")
+
+
+## Namierzenie bez obserwacji strażnika niczego nie zmienia — kamera sama
+## nie podnosi alarmu.
+func test_marking_without_guard_sighting_changes_nothing() -> void:
+	var guard := _make_guard()
+	for i in range(5):
+		guard.move_step()
+		assert_array(guard.update_state(false, true)).is_empty()
+	assert_str(guard.state).is_equal(GuardFsm.STATE_PATROL)
+	assert_int(guard.visible_streak).is_equal(0)
+
+
+## Ścieżki z namierzeniem mieszczą się w tej samej tabeli przejść.
+func test_no_illegal_transition_occurs_with_marked_intruder() -> void:
+	var patterns := [
+		[[true, true]],
+		[[false, true], [true, true]],
+		[[true, false], [false, true], [true, true]],
+		[[true, false], [false, false], [false, true], [true, true]],
+	]
+	for pattern: Array in patterns:
+		var guard := _make_guard()
+		for step: Array in pattern:
+			guard.move_step()
+			for transition: Dictionary in guard.update_state(bool(step[0]), bool(step[1])):
+				assert_bool(GuardFsm.is_transition_allowed(
+						String(transition["from"]), String(transition["to"]))) \
+					.append_failure_message("niedozwolone przejscie %s -> %s" % [
+						transition["from"], transition["to"]]) \
+					.is_true()

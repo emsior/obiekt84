@@ -15,7 +15,9 @@
 ##   8. dopisanie zdarzeń do logu w stabilnej kolejności,
 ##   9. udostępnienie nowego snapshotu warstwie prezentacji.
 ##
-## Gdy w tym samym ticku wykryją intruza kamera i strażnik, priorytet ma kamera.
+## Kamera nie wykrywa intruza — namierza go. Wykrywa wyłącznie strażnik: po
+## namierzeniu wystarcza mu jeden tick widoczności zamiast dwóch
+## (`docs/DECISIONS.md`, 2026-09-24, L1-C).
 class_name Simulation
 extends RefCounted
 
@@ -25,7 +27,6 @@ const SECONDS_PER_TICK := 1.0 / float(TICKS_PER_SECOND)
 
 const SUBJECT_SIMULATION := "simulation"
 
-const REASON_CAMERA := "camera_detection"
 const REASON_GUARD_ALARM := "guard_alarm"
 
 var _scenario: ScenarioL0 = null
@@ -79,17 +80,17 @@ func step() -> void:
 	if reached_waypoint >= 0:
 		_queue(_state.guard.id, "WAYPOINT_REACHED", "waypoint_%d" % reached_waypoint)
 
-	# Faza 4 — FOV kamery. Kamera ma priorytet nad strażnikiem.
-	var detection_reason := ""
-	if _state.intruder.state == IntruderScript.STATE_MOVE:
+	# Faza 4 — FOV kamery. Pierwsza obserwacja namierza intruza; kamera sama
+	# nie kończy nocy. Namierzenie jest jednorazowe i trwa do końca przebiegu.
+	if _state.intruder.state == IntruderScript.STATE_MOVE and not _state.intruder.marked:
 		var camera_sees := FovCalculator.is_target_visible(
 			_state.camera_position,
 			_state.camera_facing,
 			_state.camera_range,
 			_state.intruder.position)
 		if camera_sees:
-			_queue(_state.camera_id, "DETECTION", "intruder_in_camera_fov")
-			detection_reason = REASON_CAMERA
+			_state.intruder.marked = true
+			_queue(_state.camera_id, "MARKED", "intruder_in_camera_fov")
 
 	# Faza 5 — FOV strażnika.
 	var guard_sees := FovCalculator.is_target_visible(
@@ -99,15 +100,13 @@ func step() -> void:
 		_state.intruder.position)
 
 	# Faza 6 — FSM w stabilnej kolejności: najpierw strażnik, potem intruz.
-	for transition: Dictionary in _state.guard.update_state(guard_sees):
+	for transition: Dictionary in _state.guard.update_state(guard_sees, _state.intruder.marked):
 		_queue(_state.guard.id, String(transition["to"]), String(transition["reason"]))
-	if _state.guard.state == GuardFsm.STATE_ALARM and detection_reason == "":
-		detection_reason = REASON_GUARD_ALARM
 
 	if _state.intruder.state == IntruderScript.STATE_MOVE:
-		if detection_reason != "":
+		if _state.guard.state == GuardFsm.STATE_ALARM:
 			_state.intruder.state = IntruderScript.STATE_DETECTED
-			_queue(_state.intruder.id, IntruderScript.STATE_DETECTED, detection_reason)
+			_queue(_state.intruder.id, IntruderScript.STATE_DETECTED, REASON_GUARD_ALARM)
 		elif _state.intruder.has_reached_route_end():
 			_state.intruder.state = IntruderScript.STATE_SUCCESS
 			_queue(_state.intruder.id, IntruderScript.STATE_SUCCESS, "route_completed")

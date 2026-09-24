@@ -59,19 +59,21 @@ Gra otwarta przez `file://` nie wystartuje — potrzebny jest serwer HTTP (`inde
 2. Faza PLAN widoczna, oś czasu ukryta.
 3. Klik w kamerę obraca ją; przeciągnięcie węzła i kamery zmienia plan; upuszczenie kamery na trasę daje czerwony komunikat.
 4. `Uruchom noc` → plan domyślny kończy się `DANE WYKRADZIONE — tick 40`.
-5. `Wróć do planu`, kamera na (17,9) w dół → `OBIEKT ZABEZPIECZONY — tick 36`, w logu `camera_detection`.
+5. `Wróć do planu`, sama kamera na (12,9) w dół → nadal `DANE WYKRADZIONE — tick 40` (w logu `MARKED`); potem węzeł 3 z (16,7) na (16,8) → `OBIEKT ZABEZPIECZONY — tick 32`, w logu `guard_alarm`.
 6. Klik w oś czasu w nocy przewija przebieg; Spacja nie przewija strony.
 
 ## Jak grać
 
 Bronisz obiektu przed intruzem, który idzie jawną trasą do celu (żółty znacznik). Masz jednego strażnika z czterema punktami patrolu i jedną kamerę.
 
-1. **PLAN.** Okno startuje w fazie planowania z planem domyślnym. **Plan domyślny przegrywa**: strażnik dostrzega intruza w 32 ticku, ale patrol jest za krótki, gubi go i intruz dociera do celu. Na planszy widać patrol (ponumerowane węzły 1–4 i przerywaną ścieżkę), kamerę, oba stożki widzenia w pozycji startowej i pełną trasę intruza — zanim noc się zacznie, widać, co jest pilnowane.
+1. **PLAN.** Okno startuje w fazie planowania z planem domyślnym. **Plan domyślny przegrywa**: patrol jest za krótki, strażnik w ogóle nie widzi intruza i ten dociera do celu. Na planszy widać patrol (ponumerowane węzły 1–4 i przerywaną ścieżkę), kamerę, oba stożki widzenia w pozycji startowej i pełną trasę intruza — zanim noc się zacznie, widać, co jest pilnowane.
    - **przeciągnij węzeł** — przenosi punkt patrolu na komórkę pod kursorem; strażnik zawsze startuje na węźle 1,
    - **przeciągnij kamerę** — przenosi kamerę,
    - **klik w kamerę** — obraca ją o 90° zgodnie z ruchem wskazówek zegara.
 
    Upuszczenie poza planszą, kamery na trasie intruza albo na węźle patrolu, lub węzła na kamerze jest odrzucane: element wraca na miejsce, a pod nagłówkiem przez 2 s widać czerwony powód.
+
+   **Kamera namierza, strażnik zatrzymuje.** Kamera sama nie wykrywa intruza — gdy go zobaczy, oznacza go jako namierzonego (`NAMIERZONY` w HUD, `MARKED` w logu). Od tej chwili wystarczy, że strażnik zobaczy go choć przez jeden tick, żeby podnieść alarm; bez namierzenia potrzebuje dwóch ticków z rzędu. Dlatego wygrana zawsze wymaga strażnika, a w planie domyślnym — zmiany patrolu.
 2. **NOC (RUN).** **Spacja** albo przycisk **Uruchom noc** — przebieg rusza od razu. To deterministyczna symulacja: ten sam plan zawsze daje tę samą noc.
 3. **Wynik.** Zielone `OBIEKT ZABEZPIECZONY` — intruz wykryty, obrona się udała. Czerwone `DANE WYKRADZIONE` — intruz dotarł do celu. **P** albo **Wróć do planu** przenosi z powrotem do planowania **z zachowanym planem** — poprawiasz i odpalasz noc ponownie. Wrócić można też w trakcie nocy.
 
@@ -161,7 +163,7 @@ $env:GODOT_BIN = 'C:\sciezka\do\Godot_v4.7.2-stable_win64_console.exe'
 "%GODOT_BIN%" --headless --path . -s res://addons/gdUnit4/bin/GdUnitCmdTool.gd -a tests --ignoreHeadlessMode
 ```
 
-Wynik ostatniego uruchomienia: **144 przypadki testowe, 0 błędów, 0 failures, 0 flaky, 0 skipped, 0 orphans, exit code 0.**
+Wynik ostatniego uruchomienia: **156 przypadków testowych, 0 błędów, 0 failures, 0 flaky, 0 skipped, 0 orphans, exit code 0.**
 
 Po dodaniu nowego skryptu z `class_name` (np. `PlanEditor`) trzeba raz odświeżyć cache klas globalnych: `"%GODOT_BIN%" --headless --path . --import`. CI robi ten krok przed testami.
 
@@ -180,20 +182,21 @@ Raporty XML i HTML lądują w `reports/` (katalog ignorowany przez Git).
 ### Regresja golden log
 
 `tests/test_l0_golden_log.gd` porównuje bieżące przebiegi z **pięcioma** zatwierdzonymi
-artefaktami — po jednym na każdy terminalny wynik silnika L0 i dwa dla zagadki L1-A:
+artefaktami — po jednym na każdy terminalny wynik silnika L0 i dwa dla zagadki (od L1-C):
 
 | Fixture | Ścieżka | Outcome |
 |---|---|---|
 | `tests/fixtures/l0_incident_golden_log.txt` | wykrycie intruza przez strażnika | `INTRUDER_DETECTED`, tick 38 |
 | `tests/fixtures/l0_success_golden_log.txt` | intruz kończy trasę | `INTRUDER_SUCCESS`, tick 40 |
 | `tests/fixtures/l0_tick_limit_golden_log.txt` | wyczerpanie limitu ticków | `TICK_LIMIT`, tick 20 |
-| `tests/fixtures/l0_puzzle_default_golden_log.txt` | plan domyślny L1-A przegrywa | `INTRUDER_SUCCESS`, tick 40 |
-| `tests/fixtures/l0_puzzle_solution_golden_log.txt` | plan referencyjny: wykrycie przez kamerę | `INTRUDER_DETECTED`, tick 36 |
+| `tests/fixtures/l0_puzzle_default_golden_log.txt` | plan domyślny przegrywa, strażnik nie widzi intruza | `INTRUDER_SUCCESS`, tick 40 |
+| `tests/fixtures/l0_puzzle_solution_golden_log.txt` | plan referencyjny: kamera namierza, strażnik zatrzymuje | `INTRUDER_DETECTED`, tick 32 |
 
 Warianty sukcesu i limitu to te same dane z `ScenarioL0.create()` z jednym świadomie
 zmienionym polem (odpowiednio: mniejszy zasięg widzenia strażnika, krótszy `max_ticks`).
 Plan domyślny to `ScenarioL0.create_puzzle()`. Plan referencyjny jest zapisany w teście
-jawnie: te same cztery węzły patrolu i kamera przeniesiona na `(17,9)`, skierowana w dół.
+jawnie: węzeł 3 przesunięty z `(16,7)` na `(16,8)` i kamera przeniesiona na `(12,9)`, skierowana w dół.
+Każda z tych dwóch zmian osobno przegrywa (`tests/test_puzzle_design.gd`).
 Wynik wynika z normalnej pracy silnika, nie z wymuszenia. Fixture'y chronią przed zmianą
 reguł, której nie wykryje test 50/50 — bo tamten dowodzi tylko, że przebiegi są wzajemnie
 identyczne, a nie że nadal zgadzają się z zatwierdzonym zachowaniem.
@@ -232,7 +235,7 @@ z komunikatem wskazującym nazwę pola.
 - Siatka logiczna 20 × 20, trzymana w pamięci, a nie jako 400 node'ów.
 - Jeden strażnik, cztery waypointy patrolu, FSM `PATROL / SUSPICION / ALARM / RETURN`.
 - Jeden intruz na jawnej trasie, FSM `MOVE / DETECTED / SUCCESS`.
-- Jedna statyczna kamera wykrywająca intruza czysto matematycznie.
+- Jedna statyczna kamera z polem widzenia liczonym czysto matematycznie (w L0 wykrywała intruza; od L1-C tylko go namierza).
 - Sztywny tick logiczny 10 Hz, niezależny od FPS i renderowania.
 - Event log o stałym schemacie `tick | subject | event | reason`.
 - UI: sterowanie klawiaturą i przyciskami, HUD ze stanem, komunikatem końcowym i panelem zdarzeń.
@@ -245,6 +248,12 @@ Incydent z `ScenarioL0.create()` kończy się w 38 ticku wykryciem intruza przez
 - Faza PLAN: edytor czterech węzłów patrolu (liczba stała) i kamery — przeciąganie i obrót kamery. Edytor zmienia wyłącznie roboczą kopię danych scenariusza; rdzeń dostaje ją przez `Simulation.initialize()` i nic nie wie o UI.
 - Faza RUN: ta sama deterministyczna noc co w L0, z pełnym sterowaniem przebiegiem. Powrót do planu zachowuje plan.
 - Plan domyślny przegrywa, plan referencyjny wygrywa — oba pilnowane golden logami.
+
+## Zakres L1-C
+
+- Reguła „kamera namierza, strażnik zatrzymuje”: kamera nie wykrywa, tylko namierza; namierzony intruz zostaje zatrzymany po jednym ticku widoczności przez strażnika.
+- Patrol zagadki `(10,4) (16,4) (16,7) (10,7)`: sama kamera nie wygrywa w żadnym z 1420 ustawień (test wyczerpujący), plan referencyjny wymaga jednocześnie zmiany patrolu i kamery.
+- Trzy golden logi L0 bez zmian; dwa golden logi zagadki wymienione świadomie (`docs/DECISIONS.md`, 2026-09-24, L1-C).
 
 ## Świadome ograniczenia tej iteracji
 

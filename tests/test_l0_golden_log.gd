@@ -10,9 +10,10 @@
 ##   * sukces intruza     (INTRUDER_SUCCESS)  — te same dane z jednym świadomie
 ##     zmienionym parametrem: mniejszy zasięg widzenia strażnika,
 ##   * limit ticków       (TICK_LIMIT)        — te same dane z krótszym max_ticks,
-##   * plan domyślny L1-A (INTRUDER_SUCCESS)  — ScenarioL0.create_puzzle(),
-##   * rozwiązanie L1-A   (INTRUDER_DETECTED) — dane zagadki z jawnie zapisanym
-##     planem gracza: cztery waypointy, pozycja i kierunek kamery.
+##   * plan domyślny zagadki (INTRUDER_SUCCESS)  — ScenarioL0.create_puzzle(),
+##   * rozwiązanie zagadki   (INTRUDER_DETECTED) — dane zagadki z jawnie zapisanym
+##     planem gracza: cztery waypointy, pozycja i kierunek kamery. Kamera namierza,
+##     strażnik zatrzymuje (L1-C).
 ##
 ## Czysty test rdzenia: zero node'ów, zero scen, zero Timerów, zero inputu,
 ## zero czasu rzeczywistego. Fixture'y są zatwierdzonymi artefaktami repozytorium
@@ -38,22 +39,23 @@ const SUCCESS_GUARD_VIEW_RANGE := 4
 ## waypointy, a wykrycie (tick 38) i sukces (tick 40) nie maja szans wystapic.
 const TICK_LIMIT_MAX_TICKS := 20
 
-## Referencyjny plan gracza dla zagadki L1-A, zapisany jawnie — nie wyliczany
+## Referencyjny plan gracza dla zagadki, zapisany jawnie — nie wyliczany
 ## i nie pobierany z create_puzzle(), żeby zmiana danych zagadki nie mogła po
-## cichu zmienić także rozwiązania. Patrol zostaje, kamera staje przy celu
-## intruza i patrzy w dół na ostatni odcinek jego trasy.
+## cichu zmienić także rozwiązania. Węzeł 3 schodzi o wiersz niżej, kamera staje
+## nad korytarzem i patrzy w dół: namierza intruza w 31 ticku, strażnik dostrzega
+## go w 32 i od razu podnosi alarm (L1-C).
 const SOLUTION_WAYPOINTS: Array[Vector2i] = [
 	Vector2i(10, 4),
 	Vector2i(16, 4),
 	Vector2i(16, 8),
-	Vector2i(10, 8),
+	Vector2i(10, 7),
 ]
-const SOLUTION_CAMERA_POSITION := Vector2i(17, 9)
+const SOLUTION_CAMERA_POSITION := Vector2i(12, 9)
 const SOLUTION_CAMERA_FACING := Vector2i(0, 1)
 
 ## Ticki zakończenia zatwierdzonych przebiegów zagadki.
 const PUZZLE_DEFAULT_TERMINAL_TICK := 40
-const PUZZLE_SOLUTION_TERMINAL_TICK := 36
+const PUZZLE_SOLUTION_TERMINAL_TICK := 32
 
 
 # === wspolne helpery ==========================================================
@@ -561,18 +563,22 @@ func test_puzzle_solution_is_valid_plan() -> void:
 
 
 ## Istnieje plan, który wygrywa — i wygrywa normalną pracą silnika: kamera
-## wykrywa intruza na ostatnim odcinku trasy.
-func test_puzzle_solution_ends_with_camera_detection() -> void:
+## namierza intruza, a strażnik, który go potem zobaczy, od razu podnosi alarm.
+func test_puzzle_solution_ends_with_guard_alarm_after_camera_mark() -> void:
 	var simulation := _run_scenario_to_terminal(_create_puzzle_solution_scenario())
 
 	assert_str(simulation.get_outcome()) \
 		.append_failure_message("plan referencyjny nie wygrywa") \
 		.is_equal(SimulationState.OUTCOME_INTRUDER_DETECTED)
 	assert_int(simulation.get_tick()).is_equal(PUZZLE_SOLUTION_TERMINAL_TICK)
-	assert_str(simulation.get_canonical_log()) \
-		.append_failure_message("wykrycie nie nastapilo przez kamere") \
+	var canonical := simulation.get_canonical_log()
+	assert_str(canonical) \
+		.append_failure_message("kamera nie namierzyla intruza") \
+		.contains("|%s|MARKED|intruder_in_camera_fov" % ScenarioL0.CAMERA_ID)
+	assert_str(canonical) \
+		.append_failure_message("wykrycie nie nastapilo przez alarm straznika") \
 		.contains("|%s|%s|%s" % [
-			ScenarioL0.INTRUDER_ID, IntruderScript.STATE_DETECTED, Simulation.REASON_CAMERA])
+			ScenarioL0.INTRUDER_ID, IntruderScript.STATE_DETECTED, Simulation.REASON_GUARD_ALARM])
 
 
 func test_puzzle_solution_canonical_event_log_matches_golden_fixture() -> void:
@@ -609,10 +615,14 @@ func test_puzzle_solution_golden_fixture_is_well_formed() -> void:
 	assert_array(Array(fixture["state"] as PackedStringArray)) \
 		.append_failure_message("fixture rozwiazania nie deklaruje outcome=INTRUDER_DETECTED") \
 		.contains(["outcome=%s" % SimulationState.OUTCOME_INTRUDER_DETECTED])
-	assert_str("\n".join(fixture["events"] as PackedStringArray)) \
-		.append_failure_message("fixture rozwiazania nie zawiera wykrycia przez kamere") \
+	var joined := "\n".join(fixture["events"] as PackedStringArray)
+	assert_str(joined) \
+		.append_failure_message("fixture rozwiazania nie zawiera namierzenia przez kamere") \
+		.contains("|%s|MARKED|intruder_in_camera_fov" % ScenarioL0.CAMERA_ID)
+	assert_str(joined) \
+		.append_failure_message("fixture rozwiazania nie zawiera wykrycia przez alarm straznika") \
 		.contains("|%s|%s|%s" % [
-			ScenarioL0.INTRUDER_ID, IntruderScript.STATE_DETECTED, Simulation.REASON_CAMERA])
+			ScenarioL0.INTRUDER_ID, IntruderScript.STATE_DETECTED, Simulation.REASON_GUARD_ALARM])
 
 
 ## Plan gracza nie może przeciekać do danych zagadki ani do create().

@@ -7,9 +7,10 @@
 ## Ticki są wyzwalane przez jawną emisję sygnału Timera, a nie przez czekanie na
 ## czas rzeczywisty: kontrakt adaptera brzmi "jeden timeout to jeden step()".
 ##
-## Scena startuje w fazie PLAN z planem domyślnym zagadki L1-A
-## (`ScenarioL0.create_puzzle()`), który przegrywa w 40 ticku: strażnik dostrzega
-## intruza w 32, gubi w 33, wraca do patrolu w 34.
+## Scena startuje w fazie PLAN z planem domyślnym zagadki
+## (`ScenarioL0.create_puzzle()`), który przegrywa w 40 ticku: strażnik w ogóle
+## nie widzi intruza. Plan referencyjny (węzeł 3 niżej, kamera nad korytarzem)
+## wygrywa w 32 ticku: kamera namierza w 31, strażnik zatrzymuje w 32 (L1-C).
 extends GdUnitTestSuite
 
 const MAIN_SCENE := "res://scenes/main.tscn"
@@ -23,8 +24,15 @@ const HUD_COLUMN_LEFT := 620.0
 
 ## Przebieg planu domyslnego (tests/fixtures/l0_puzzle_default_golden_log.txt).
 const PUZZLE_TERMINAL_TICK := 40
-const PUZZLE_DECISION_TICKS: Array[int] = [32, 33, 34, 40]
-const PUZZLE_SUSPICION_TICK := 32
+const PUZZLE_WAYPOINT_2 := Vector2i(16, 7)
+const PUZZLE_CAMERA := Vector2i(3, 3)
+
+## Plan referencyjny (tests/fixtures/l0_puzzle_solution_golden_log.txt).
+const SOLUTION_WAYPOINT_2 := Vector2i(16, 8)
+const SOLUTION_CAMERA := Vector2i(12, 9)
+const SOLUTION_MARK_TICK := 31
+const SOLUTION_TERMINAL_TICK := 32
+const SOLUTION_DECISION_TICKS: Array[int] = [31, 32]
 
 ## Indeksy faz (enum Phase w simulation_runner.gd).
 const PHASE_PLAN := 0
@@ -59,6 +67,18 @@ func _press_key(scene: Node, keycode: Key) -> void:
 	key.keycode = keycode
 	key.pressed = true
 	scene.call("_unhandled_input", key)
+
+
+## Plan referencyjny ustawiony edytorem: węzeł 3 o wiersz niżej, kamera nad
+## korytarzem (kierunek w dół zostaje z planu domyślnego).
+func _apply_reference_plan(scene: Node) -> void:
+	var editor := scene.get_node("PlanEditor") as PlanEditor
+	assert_bool(editor.begin_drag(PUZZLE_WAYPOINT_2)).is_true()
+	editor.drag_to(SOLUTION_WAYPOINT_2)
+	assert_bool(editor.end_drag()).is_true()
+	assert_bool(editor.begin_drag(PUZZLE_CAMERA)).is_true()
+	editor.drag_to(SOLUTION_CAMERA)
+	assert_bool(editor.end_drag()).is_true()
 
 
 func test_main_scene_starts_in_plan_phase() -> void:
@@ -268,7 +288,7 @@ func test_restart_preserves_player_plan() -> void:
 	var hud := scene.get_node("HudLayer/Hud") as Hud
 	var editor := scene.get_node("PlanEditor") as PlanEditor
 
-	assert_bool(editor.begin_drag(Vector2i(16, 8))).is_true()
+	assert_bool(editor.begin_drag(PUZZLE_WAYPOINT_2)).is_true()
 	editor.drag_to(Vector2i(16, 10))
 	assert_bool(editor.end_drag()).is_true()
 
@@ -397,25 +417,36 @@ func test_only_decision_ticks_are_highlighted() -> void:
 	assert_array(scene.call("notable_events")).is_empty()
 	assert_array(scene.call("highlight_cells")).is_empty()
 
+	_apply_reference_plan(scene)
 	_enter_run_paused(scene)
-	# Tick 31 to zwykle minięcie waypointu.
-	for i in range(PUZZLE_SUSPICION_TICK - 1):
+	# Tick 27 to zwykle minięcie waypointu.
+	for i in range(27):
 		scene.call("single_step")
-	assert_int(_simulation_of(scene).get_tick()).is_equal(PUZZLE_SUSPICION_TICK - 1)
 	assert_array(scene.call("notable_events")) \
 		.append_failure_message("rutynowy waypoint nie powinien byc wyrozniony") \
 		.is_empty()
 	assert_array(scene.call("highlight_cells")).is_empty()
 
-	# Tick 32 to przejscie straznika w SUSPICION.
-	scene.call("single_step")
-	assert_int(_simulation_of(scene).get_tick()).is_equal(PUZZLE_SUSPICION_TICK)
+	# Tick 31: waypoint (rutyna) i namierzenie przez kamerę (decyzja).
+	for i in range(SOLUTION_MARK_TICK - 27):
+		scene.call("single_step")
+	assert_int(_simulation_of(scene).get_tick()).is_equal(SOLUTION_MARK_TICK)
 
 	var notable: Array = scene.call("notable_events")
 	assert_int(notable.size()) \
-		.append_failure_message("przejscie FSM powinno byc wyroznione") \
+		.append_failure_message("namierzenie przez kamere powinno byc wyroznione, waypoint nie") \
 		.is_equal(1)
-	assert_str(String(notable[0]["event"])).is_equal(GuardFsm.STATE_SUSPICION)
+	assert_str(String(notable[0]["event"])).is_equal("MARKED")
+	assert_array(scene.call("highlight_cells")) \
+		.append_failure_message("wyrozniona komorka kamery powinna byc wskazana") \
+		.is_equal([SOLUTION_CAMERA])
+
+	# Tick 32: strażnik przechodzi SUSPICION → ALARM, intruz wykryty.
+	scene.call("single_step")
+	var events: Array[String] = []
+	for entry: Dictionary in scene.call("notable_events"):
+		events.append(String(entry["event"]))
+	assert_array(events).contains([GuardFsm.STATE_SUSPICION, GuardFsm.STATE_ALARM])
 	assert_array(scene.call("highlight_cells")) \
 		.append_failure_message("wyrozniona komorka straznika powinna byc wskazana") \
 		.contains([_simulation_of(scene).get_state_snapshot()["guard_position"]])
@@ -426,6 +457,7 @@ func test_timeline_marks_decision_ticks_and_terminal_tick() -> void:
 	var runner := scene_runner(MAIN_SCENE)
 	await runner.simulate_frames(1)
 	var scene := runner.scene()
+	_apply_reference_plan(scene)
 	_enter_run_paused(scene)
 
 	assert_array(scene.call("timeline_event_ticks")).is_empty()
@@ -439,8 +471,8 @@ func test_timeline_marks_decision_ticks_and_terminal_tick() -> void:
 	assert_bool(_simulation_of(scene).is_finished()).is_true()
 	assert_array(scene.call("timeline_event_ticks")) \
 		.append_failure_message("os czasu powinna znaczyc ticki decyzji, bez waypointow") \
-		.is_equal(PUZZLE_DECISION_TICKS)
-	assert_int(int(scene.call("terminal_tick"))).is_equal(PUZZLE_TERMINAL_TICK)
+		.is_equal(SOLUTION_DECISION_TICKS)
+	assert_int(int(scene.call("terminal_tick"))).is_equal(SOLUTION_TERMINAL_TICK)
 
 
 ## Dymny test: cofanie działa dzięki determinizmowi rdzenia — odtworzenie
@@ -559,7 +591,7 @@ func test_phase_keys_switch_between_plan_and_run() -> void:
 	var scene := runner.scene()
 	var editor := scene.get_node("PlanEditor") as PlanEditor
 
-	assert_bool(editor.begin_drag(Vector2i(16, 8))).is_true()
+	assert_bool(editor.begin_drag(PUZZLE_WAYPOINT_2)).is_true()
 	editor.drag_to(Vector2i(16, 10))
 	editor.end_drag()
 
@@ -598,7 +630,7 @@ func test_mouse_drag_on_board_moves_waypoint() -> void:
 	var press := InputEventMouseButton.new()
 	press.button_index = MOUSE_BUTTON_LEFT
 	press.pressed = true
-	press.global_position = board_origin + Vector2(Vector2i(16, 8) * LevelView.CELL_SIZE) + half_cell
+	press.global_position = board_origin + Vector2(PUZZLE_WAYPOINT_2 * LevelView.CELL_SIZE) + half_cell
 	scene.call("_unhandled_input", press)
 	assert_bool(editor.is_dragging()).is_true()
 
@@ -632,7 +664,7 @@ func test_board_mouse_input_reaches_runner_through_viewport() -> void:
 	var viewport := scene.get_viewport()
 	var board_origin := (scene.get_node("LevelL0") as Node2D).global_position
 	var half_cell := Vector2.ONE * float(LevelView.CELL_SIZE) * 0.5
-	var from := board_origin + Vector2(Vector2i(16, 8) * LevelView.CELL_SIZE) + half_cell
+	var from := board_origin + Vector2(PUZZLE_WAYPOINT_2 * LevelView.CELL_SIZE) + half_cell
 	var to := board_origin + Vector2(Vector2i(16, 11) * LevelView.CELL_SIZE) + half_cell
 
 	var press := InputEventMouseButton.new()

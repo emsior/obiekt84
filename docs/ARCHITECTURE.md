@@ -41,14 +41,14 @@ Kolejność faz jest stała i nigdy nie zależy od Scene Tree:
 1. **Zwiększenie numeru ticka** — dokładnie raz, na początku kroku.
 2. **Ruch intruza** — najwyżej do następnej komórki jawnej trasy.
 3. **Ruch strażnika** — zależny od stanu FSM: `PATROL` idzie po waypointach, `RETURN` wraca do punktu wznowienia, `SUSPICION` i `ALARM` stoją.
-4. **FOV kamery.**
+4. **FOV kamery** — pierwsza obserwacja **namierza** intruza (jeden wpis `MARKED`); kamera nie wykrywa.
 5. **FOV strażnika.**
-6. **Aktualizacja FSM** — najpierw strażnik, potem intruz.
+6. **Aktualizacja FSM** — najpierw strażnik, potem intruz. Przy namierzonym intruzie strażnikowi wystarcza jeden tick widoczności do alarmu.
 7. **Rozstrzygnięcie wyniku terminalnego.**
 8. **Dopisanie zdarzeń do logu** — z bufora zebranego w fazach 2–7, w kolejności powstania.
 9. **Udostępnienie snapshotu** warstwie prezentacji.
 
-**Priorytet wykrycia:** jeżeli w tym samym ticku intruza wykryją kamera i strażnik, powód zapisany w logu to `camera_detection`.
+**Wykrycie:** wykrywa wyłącznie strażnik (powód `guard_alarm`). Kamera namierza — obniża próg alarmu strażnika z dwóch kolejnych ticków widoczności do jednego. Namierzenie jest jednorazowe, trwa do końca przebiegu i żyje w stanie intruza (`IntruderScript.marked`), w snapshocie jako `intruder_marked`, ale nie w reprezentacji kanonicznej (`docs/DECISIONS.md`, 2026-09-24, L1-C).
 
 **Priorytet zakończenia:** wykrycie wyprzedza sukces. Jeżeli w tym samym ticku intruz dotrze na koniec trasy i zostanie wykryty, wynikiem jest `INTRUDER_DETECTED`.
 

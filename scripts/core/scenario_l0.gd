@@ -64,20 +64,21 @@ static func create() -> ScenarioL0:
 	return scenario
 
 
-## Dane zagadki L1-A: plan domyślny, który gracz dostaje w fazie planowania.
+## Dane zagadki: plan domyślny, który gracz dostaje w fazie planowania.
 ##
 ## Te same wymiary, trasa intruza, kamera i zasięgi co [method create] — inny jest
-## wyłącznie patrol. Dolny bok prostokąta leży za wysoko: strażnik dostrzega
-## intruza w 32 ticku, gubi go w następnym, wraca do patrolu, a intruz kończy
-## trasę w 40 ticku. Przegrana wynika z ustawienia patrolu, nie z osłabienia
-## strażnika. `create()` zostaje nietknięte — chroni zatwierdzone golden logi.
+## wyłącznie patrol. Dolny bok prostokąta leży za wysoko: strażnik w ogóle nie
+## widzi intruza, a ten kończy trasę w 40 ticku. Przegrana wynika z ustawienia
+## patrolu, nie z osłabienia strażnika. Sama kamera tego nie naprawi — ona tylko
+## namierza, zatrzymuje strażnik (L1-C). `create()` zostaje nietknięte — chroni
+## zatwierdzone golden logi.
 static func create_puzzle() -> ScenarioL0:
 	var scenario := create()
 	scenario.guard_waypoints = [
 		Vector2i(10, 4),
 		Vector2i(16, 4),
-		Vector2i(16, 8),
-		Vector2i(10, 8),
+		Vector2i(16, 7),
+		Vector2i(10, 7),
 	] as Array[Vector2i]
 	scenario.guard_start = scenario.guard_waypoints[0]
 	return scenario

@@ -75,6 +75,10 @@ func to_snapshot() -> Dictionary:
 		"intruder_position": intruder.position,
 		"intruder_route_index": intruder.route_index,
 		"intruder_route": intruder.get_route(),
+		# Tylko w snapshocie dla prezentacji, nie w `to_canonical()`: namierzenie
+		# wynika jednoznacznie z wpisu MARKED w logu, a nowe pole kanoniczne
+		# zmieniłoby [FINAL_STATE] wszystkich zatwierdzonych golden logów.
+		"intruder_marked": intruder.marked,
 		"camera_id": camera_id,
 		"camera_position": camera_position,
 		"camera_facing": camera_facing,

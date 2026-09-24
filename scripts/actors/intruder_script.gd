@@ -13,6 +13,9 @@ var id: String
 var state: String
 var position: Vector2i
 var route_index: int
+## Intruz namierzony przez kamerę. Kamera sama nie wykrywa — namierzenie obniża
+## próg alarmu strażnika do jednego ticka widoczności (`GuardFsm.update_state`).
+var marked: bool
 
 var _route: Array[Vector2i] = []
 
@@ -27,6 +30,7 @@ func reset() -> void:
 	state = STATE_MOVE
 	route_index = 0
 	position = _route[0]
+	marked = false
 
 
 func route_size() -> int:

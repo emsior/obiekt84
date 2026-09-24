@@ -321,3 +321,97 @@ func test_detection_has_priority_over_tick_limit_on_same_tick() -> void:
 	assert_int(simulation.get_tick()).is_equal(tick_before)
 	assert_str(simulation.get_canonical_log()).is_equal(log_before)
 	assert_str(simulation.get_canonical_snapshot()).is_equal(snapshot_before)
+
+
+# === kamera namierza, strażnik zatrzymuje (L1-C) ==============================
+
+## Plan referencyjny zagadki: W3 o wiersz niżej i kamera nad korytarzem.
+## Powtórzony jawnie za `tests/test_l0_golden_log.gd` — test rdzenia nie zależy
+## od innego pliku testów.
+func _marked_solution_scenario() -> ScenarioL0:
+	var scenario := ScenarioL0.create_puzzle()
+	scenario.guard_waypoints[2] = Vector2i(16, 8)
+	scenario.camera_position = Vector2i(12, 9)
+	scenario.camera_facing = Vector2i.DOWN
+	return scenario
+
+
+func _count_marked_entries(simulation: Simulation) -> int:
+	var count := 0
+	for entry: Dictionary in simulation.get_event_log():
+		if String(entry["subject"]) == ScenarioL0.CAMERA_ID and String(entry["event"]) == "MARKED":
+			count += 1
+	return count
+
+
+## Kamera widzi intruza, ale strażnik nie — noc kończy się sukcesem intruza.
+## Kamera sama nigdy nie wykrywa.
+func test_camera_sighting_alone_does_not_end_the_night() -> void:
+	var scenario := ScenarioL0.create_puzzle()
+	scenario.camera_position = Vector2i(12, 9)
+	scenario.camera_facing = Vector2i.DOWN
+	var simulation := Simulation.new()
+	simulation.initialize(scenario)
+	while not simulation.is_finished():
+		simulation.step()
+
+	assert_str(simulation.get_outcome()) \
+		.append_failure_message("kamera sama zakonczyla noc") \
+		.is_equal(SimulationState.OUTCOME_INTRUDER_SUCCESS)
+	assert_int(_count_marked_entries(simulation)).is_equal(1)
+	assert_bool(bool(simulation.get_state_snapshot()["intruder_marked"])).is_true()
+	assert_str(simulation.get_canonical_log()) \
+		.append_failure_message("kamera nie moze byc powodem wykrycia") \
+		.not_contains("|%s|" % IntruderScript.STATE_DETECTED)
+
+
+## Na każdym ticku: `intruder_marked` w snapshocie jest prawdą wtedy i tylko
+## wtedy, gdy log zawiera dokładnie jeden wpis MARKED. Namierzenie jest jednorazowe.
+func test_intruder_marked_matches_single_marked_log_entry() -> void:
+	var simulation := Simulation.new()
+	simulation.initialize(_marked_solution_scenario())
+	assert_bool(bool(simulation.get_state_snapshot()["intruder_marked"])).is_false()
+
+	while not simulation.is_finished():
+		simulation.step()
+		var marked := bool(simulation.get_state_snapshot()["intruder_marked"])
+		var entries := _count_marked_entries(simulation)
+		assert_int(entries) \
+			.append_failure_message("tick %d: wiecej niz jeden wpis MARKED" % simulation.get_tick()) \
+			.is_less_equal(1)
+		assert_bool(marked) \
+			.append_failure_message("tick %d: flaga namierzenia rozni sie od logu" % simulation.get_tick()) \
+			.is_equal(entries == 1)
+	assert_bool(bool(simulation.get_state_snapshot()["intruder_marked"])).is_true()
+
+
+## Reset kasuje namierzenie, a ponowny przebieg daje identyczny log i snapshot.
+func test_reset_clears_mark_and_replays_identically() -> void:
+	var simulation := Simulation.new()
+	simulation.initialize(_marked_solution_scenario())
+	while not simulation.is_finished():
+		simulation.step()
+	var first_log := simulation.get_canonical_log()
+	var first_snapshot := simulation.get_canonical_snapshot()
+	assert_str(simulation.get_outcome()).is_equal(SimulationState.OUTCOME_INTRUDER_DETECTED)
+
+	simulation.reset()
+	assert_bool(bool(simulation.get_state_snapshot()["intruder_marked"])) \
+		.append_failure_message("reset nie skasowal namierzenia") \
+		.is_false()
+
+	while not simulation.is_finished():
+		simulation.step()
+	assert_str(simulation.get_canonical_log()).is_equal(first_log)
+	assert_str(simulation.get_canonical_snapshot()).is_equal(first_snapshot)
+
+
+## Namierzenie żyje w snapshocie dla prezentacji, ale nie w kanonicznej
+## reprezentacji — ta pozostaje kontraktem zatwierdzonych golden logów.
+func test_marked_flag_is_not_part_of_canonical_snapshot() -> void:
+	assert_array(Array(SimulationState.canonical_field_names())).not_contains(["intruder_marked"])
+	var simulation := Simulation.new()
+	simulation.initialize(_marked_solution_scenario())
+	while not simulation.is_finished():
+		simulation.step()
+	assert_str(simulation.get_canonical_snapshot()).not_contains("marked")
