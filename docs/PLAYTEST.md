@@ -1,229 +1,155 @@
-# Formularz playtestu L0
+# Playtest — OBIEKT '84
 
-Jedna sesja, jeden tester, około 10 minut. Nie podpowiadaj — notuj, co tester robi sam.
+Ślepy test z osobą spoza projektu. Wyniki zasilają dwa otwarte kryteria z [MVP_L0.md](MVP_L0.md) i arkusz decyzji GO/KILL.
+Cel testów: sprawdzić, czy pętla **ustaw patrol i kamerę → uruchom noc → zobacz, gdzie intruz przeszedł → popraw** bawi bez niczego więcej.
 
-**Tester:** ______________  **Data:** ______________  **Wersja / commit:** ______________
+Jedna sesja to jeden tester i najwyżej 20 minut. **Nie podpowiadaj i nie tłumacz reguł.** Tester dostaje tylko link i stałe wprowadzenie (trzy zdania, niżej).
+
+---
+
+## Przed sesją (prowadzący, 2 min)
+
+- [ ] Otwórz <https://emsior.github.io/obiekt84/> w świeżej karcie. Plansza i HUD są widoczne, nagłówek brzmi `PLAN OBRONY`.
+- [ ] Wpisz niżej commit wdrożenia. Znajdziesz go na github.com/emsior/obiekt84/actions: ostatni zielony przebieg na `main`.
+- [ ] Przygotuj stoper. Mierzysz dwa czasy (patrz „Pomiary”).
+- [ ] Jeśli testujesz inny wariant zagadki niż domyślny: wariant to podmieniony plik `levels/puzzle_01.json` (bez zmian w kodzie, `README.md`, „Jak dodać poziom”). Zapisz jego nazwę obok commita — wyniki różnych wariantów nie trafiają do jednego wiersza arkusza.
+- [ ] Tester korzysta z myszy. Z klawiatury potrzebna jest najwyżej Spacja.
+
+**Tester (inicjały / pseudonim):** __________  **Data:** __________  **Commit:** __________  **Wariant zagadki:** __________  **Prowadzący:** __________
+
+Doświadczenie testera z grami logicznymi / taktycznymi: ☐ żadne ☐ trochę ☐ dużo
+
+---
+
+## Wprowadzenie — powiedz dokładnie to i nic więcej
+
+> „Jesteś szefem ochrony obiektu. Intruz przyjdzie w nocy. Ustaw ochronę tak, żeby go zatrzymać.”
+
+Na pytania o zasady odpowiadaj: „Spróbuj i zobacz, co się stanie.”
 
 ---
 
 ## Przebieg
 
-1. Otwórz `main.tscn` i uruchom grę (F5). Nie tłumacz interfejsu.
-2. Poproś testera, żeby „uruchomił incydent".
-3. Pozwól obejrzeć całość do wyniku.
-4. Poproś o powtórzenie próby.
+Gra trwa do pierwszej wygranej albo 15 minut. Notuj na bieżąco. Po każdej nocy mierz dwa czasy od pojawienia się wyniku: do powrotu do planu (P2a) i do uruchomienia kolejnej nocy (P2b).
+
+| Noc | Zmiana w planie przed nocą | Wynik (`DANE WYKRADZIONE` / `OBIEKT ZABEZPIECZONY`) | P2a: wynik → plan [s] | P2b: wynik → kolejna noc [s] |
+|---|---|---|---|---|
+| 1 | | | | |
+| 2 | | | | |
+| 3 | | | | |
+| 4 | | | | |
+| 5 | | | | |
+| 6 | | | | |
+| 7 | | | | |
+| 8 | | | | |
+
+Więcej nocy dopisz pod tabelą.
 
 ---
 
-## Pytania
+## Pomiary
 
-**1. Czy tester rozumie, co robi Start?**
+**P1. Czas do pierwszego działania.** Od otwarcia strony do pierwszego przeciągnięcia albo kliknięcia na planszy: ______ s
 
-☐ tak ☐ z wahaniem ☐ nie — notatka: ______________________________________
+**P2a. Powrót do planu.** Dla każdej przegranej nocy: czas od pojawienia się wyniku do powrotu do fazy PLAN z zachowanym planem. Mierzy tarcie interfejsu, nie namysł.
+Mediana: ______ s. **Kryterium MVP „powrót do planu < 20 s”:** mediana P2a < 20 s → ☐ spełnione ☐ niespełnione
 
-**2. Czy rozumie, dlaczego intruz został wykryty?**
+**P2b. Od porażki do kolejnej nocy.** Dla każdej przegranej nocy: czas od pojawienia się wyniku do uruchomienia kolejnej nocy — razem z namysłem i przestawianiem planu. Informacyjnie, odpowiada E5 planu nadrzędnego („< 20 s od porażki do kolejnego runu”); nie rozstrzyga kryterium MVP.
+Mediana: ______ s
 
-☐ tak ☐ częściowo ☐ nie — notatka: ______________________________________
+**P3. Ukończenie.** ☐ wygrana bez pomocy ☐ wygrana po podpowiedzi ☐ brak wygranej w 15 min
+Liczba nocy do pierwszej wygranej: ______  Czas do pierwszej wygranej: ______ min
 
-**3. Czy event log pomaga wyjaśnić wynik?**
-
-☐ tak ☐ tylko po podpowiedzi ☐ nie zauważył logu — notatka: ______________
-
-**4. Czy potrafi użyć Pauzy i Restartu?**
-
-☐ obu ☐ tylko jednego ☐ żadnego — notatka: ______________________________
-
-**5. Czy po resecie stan wygląda identycznie?**
-
-☐ tak ☐ nie wie ☐ zauważył różnicę — notatka: _____________________________
-
-**6. Co było niejasne?**
+**P4. Moment niezrozumienia.** Pierwsze zawahanie albo pierwsze pytanie. Co było wtedy na ekranie i jakie padły słowa?
 
 _______________________________________________________________________
 
-_______________________________________________________________________
+---
 
-**7. Czy tester chce uruchomić próbę ponownie po zmianie konfiguracji w przyszłej wersji?**
+## Pytania po sesji (dopiero po zakończeniu gry — wcześniej podpowiadałyby)
 
-☐ tak, chętnie ☐ obojętnie ☐ nie — notatka: ______________________________
+**Q1. Co robi kamera?** Zapisz odpowiedź dosłownie: ____________________________________
+
+**Q2. Co robi strażnik?** Zapisz odpowiedź dosłownie: ____________________________________
+
+**Kryterium MVP „gracz rozumie regułę z ekranu”:** obie odpowiedzi zgodne z regułą (kamera **namierza**, strażnik **zatrzymuje**) → ☐ tak ☐ częściowo ☐ nie
+
+**Q3. Dlaczego pierwsza noc skończyła się przegraną?** (tylko jeśli była przegrana) ______________________________________________
+
+**Q4. Jak bardzo podobała Ci się gra? (1–10)** ______
+
+**Q4b. Jak czytelne było, co się stało w nocy? (1–10)** ______
+
+**Q5. Chcesz zagrać w kolejny poziom?** ☐ tak ☐ może ☐ nie — do progu „chce kolejnego poziomu” liczy się wyłącznie „tak”.
+
+**Q6. Co było najbardziej frustrujące?** ______________________________________________
+
+**Q7. Co było najfajniejsze?** ________________________________________________________
 
 ---
 
 ## Obserwacje prowadzącego
 
-Ile sekund minęło, zanim tester kliknął cokolwiek: ______
+Gdzie skupiał się wzrok — plansza czy panel boczny: ______________________________
 
-Czy patrzył na siatkę czy na panel boczny: ______________________________
+Czy linia „zasada: kamera namierza — strażnik zatrzymuje” została zauważona: ☐ tak ☐ nie ☐ nie wiadomo
 
-Pierwsza rzecz, o którą zapytał: ________________________________________
+Czy `NAMIERZONY` przy intruzie albo `MARKED` w panelu zdarzeń zostały zauważone: ☐ tak ☐ nie ☐ nie wiadomo
 
----
+Czy padło użycie osi czasu albo cofania: ☐ tak ☐ nie
 
-# First window pass — 12 punktów
-
-**Wykonany 2026-09-22.** Punkty 1–11 potwierdzone zrzutami z żywego okna
-(D3D12, 1280 × 800), punkt 12 oceną właściciela projektu: nie przytłacza.
-Checklista zostaje do powtórzenia po każdej większej zmianie w prezentacji.
-
-Pierwsze uruchomienie okna. Zajmuje kilka minut. Pełna checklista niżej jest do
-sesji playtestowej, nie do pierwszego kontaktu.
-
-Uruchom `F5` w edytorze albo `"%GODOT_BIN%" --path .`
-
-- [ ] 1. Okno otwiera się bez błędów w konsoli; plansza po lewej, HUD po prawej.
-- [ ] 2. Nagłówek `incydent w toku` jest największym tekstem w słupku HUD, podtytuł wyraźnie mniejszy.
-- [ ] 3. Panel statusu, legenda i event log mają czcionkę o stałej szerokości — kolumny się zgadzają.
-- [ ] 4. Nic nie jest ucięte przy prawej krawędzi ani nie nachodzi na siebie.
-- [ ] 5. **Spacja** uruchamia przebieg; licznik ticków rośnie, aktorzy się przesuwają.
-- [ ] 6. Przebieg zatrzymuje się sam, nagłówek robi się **czerwony**: `INTRUZ WYKRYTY — tick 38`.
-- [ ] 7. W ticku 38 na planszy widać **dwa białe obrysy**, a w logu trzy wiersze z `►`.
-- [ ] 8. Na osi czasu pod planszą widać pomarańczową kreskę (37) i czerwoną (38).
-- [ ] 9. `2` przełącza na wariant sukcesu — nagłówek **zielony**, `3` na limit — **pomarańczowy**.
-- [ ] 10. `,` cofa o tick i zdejmuje stan końcowy; `.` doprowadza z powrotem do tego samego wyniku.
-- [ ] 11. Kliknięcie w pasek osi czasu przewija przebieg.
-- [ ] 12. **Ocena subiektywna:** czy pierwszy rzut oka na ekran nie przytłacza? Czy wiadomo, co nacisnąć?
-
-Jeśli 1–11 przechodzą, a 12 budzi wątpliwości — to materiał na poprawki czytelności, nie na błąd.
+Czy faza nocy nudziła (wzrok gdzie indziej, klikanie „Szybko”): ☐ tak ☐ nie — notatka: ________________
 
 ---
 
-# Checklista manualna vertical slice L0
+# Arkusz zbiorczy — 12 testerów
 
-Do przejścia przed każdą sesją playtestu. Uruchom `F5` w edytorze albo `"%GODOT_BIN%" --path .`.
+Jeden wiersz na sesję. Progi pochodzą z kryterium KILL planu nadrzędnego (sekcja 5) i z exit criterion playtestu r1 (tydzień 5).
 
-## Stan startowy
+**Uwaga:** kryterium KILL mówi o ukończeniu **L0–L2**. Dopóki gra ma jedną zagadkę (przed E4), wiersz „Ukończenie” mierzy wyłącznie bieżący poziom i jest przybliżeniem — 8/12 na jednym poziomie **nie** oznacza spełnionego kryterium KILL.
 
-- [ ] Okno otwiera się, plansza 20 × 20 jest widoczna po lewej, HUD po prawej.
-- [ ] Status pokazuje `PAUSED`, tick `0 / 400`.
-- [ ] Widać trasę intruza, cztery waypointy, żółty marker celu, kamerę i strażnika.
-- [ ] Stożki widzenia kamery i strażnika są widoczne.
-- [ ] Panel zdarzeń jest pusty (`— brak zdarzeń —`).
+| # | Commit / wariant | Wygrana bez pomocy (P3) | Noce do wygranej | Mediana P2a [s] | Mediana P2b [s] | Rozumie regułę (Q1+Q2) | Satysfakcja 1–10 (Q4) | Czytelność 1–10 (Q4b) | Chce więcej: „tak” (Q5) |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | | | | | | | | | |
+| 2 | | | | | | | | | |
+| 3 | | | | | | | | | |
+| 4 | | | | | | | | | |
+| 5 | | | | | | | | | |
+| 6 | | | | | | | | | |
+| 7 | | | | | | | | | |
+| 8 | | | | | | | | | |
+| 9 | | | | | | | | | |
+| 10 | | | | | | | | | |
+| 11 | | | | | | | | | |
+| 12 | | | | | | | | | |
 
-## Sterowanie
+| Próg | Wymaganie | Wynik |
+|---|---|---|
+| Ukończenie bez pomocy (bieżący poziom — przybliżenie KILL „L0–L2”) | ≥ 8 / 12 | |
+| Chce kolejnego poziomu (tylko „tak”) | ≥ 7 / 12 | |
+| Mediana satysfakcji | ≥ 7 / 10 | |
+| Mediana czytelności (playtest r1) | ≥ 7 / 10 | |
+| Powrót do planu (MVP, P2a) | mediana P2a < 20 s u ≥ 8 / 12 | |
+| Rozumie regułę z ekranu (MVP) | „tak” u ≥ 8 / 12 | |
 
-- [ ] **N** przesuwa symulację dokładnie o jeden tick — licznik rośnie o 1, pozycje aktorów przeskakują o jedną komórkę.
-- [ ] **Spacja** uruchamia przebieg, status zmienia się na `RUNNING`; drugie naciśnięcie zatrzymuje, status wraca na `PAUSED`.
-- [ ] W pauzie tick nie rośnie.
-- [ ] **Escape** zatrzymuje przebieg (status `PAUSED`) i nie robi nic więcej.
-- [ ] **F** ukrywa i przywraca stożki widzenia; HUD odnotowuje `stożki: ukryte` / `widoczne`.
-- [ ] **L** ukrywa i przywraca panel zdarzeń.
-- [ ] Przyciski **Start**, **Pauza/Wznów**, **Restart** działają tak samo jak klawisze.
+Kryteria MVP „powrót do planu < 20 s” i „gracz rozumie regułę z ekranu” zaznacza się w `MVP_L0.md` dopiero na podstawie tego arkusza, nie na podstawie oceny autora.
 
-## Przebieg domyślny — wykrycie intruza
+---
 
-- [ ] Strażnik obchodzi prostokąt patrolu, w HUD pojawiają się wpisy `WAYPOINT_REACHED`.
-- [ ] W 37 ticku strażnik przechodzi w `SUSPICION` — kolor strażnika i stożka zmienia się.
-- [ ] W 38 ticku strażnik przechodzi w `ALARM`, intruz w `DETECTED`.
-- [ ] Komunikat końcowy jest **czerwony**: `INTRUZ WYKRYTY — tick 38`.
-- [ ] Status zmienia się na `FINISHED`, automatyczny przebieg zatrzymuje się sam.
-- [ ] Dalsze naciskanie **N** i **Spacji** nic nie zmienia.
+## Co jest sprawdzane automatycznie albo przed wydaniem
 
-## Trzy warianty incydentu
+Tego nie weryfikuj na sesji:
 
-Wybierane klawiszami `1` / `2` / `3` albo przyciskami w HUD. Żadnej edycji kodu.
+- geometrię HUD (mieści się w viewporcie, nic nie nachodzi) pilnuje `tests/test_main_scene.gd`;
+- determinizm (ten sam plan zawsze daje tę samą noc) pilnują testy rdzenia i golden logi;
+- techniczną sprawność buildu Web sprawdza smoke test z `README.md`, sekcja „Build Web lokalnie”, wykonywany przed każdym wydaniem;
+- czytelność wizualną (hierarchia nagłówka nad podtytułem, kolory stożków zależne od stanu strażnika, białe obrysy wyróżnienia, znaczniki osi czasu, ocena „czy nie przytłacza”) sprawdza przegląd zrzutów z prawdziwego okna przy każdej zmianie UI — **to nie jest test automatyczny**; testy pilnują logiki (kolor wyniku, lista wyróżnionych komórek, geometria HUD), nie wyglądu.
 
-- [ ] `1` — **Wykrycie**: HUD pokazuje `SCENARIUSZ: WYKRYCIE`, tick `0 / 400`. Po uruchomieniu Spacją przebieg kończy się **czerwonym** `INTRUZ WYKRYTY — tick 38`.
-- [ ] `2` — **Sukces**: HUD pokazuje `SCENARIUSZ: SUKCES INTRUZA`, tick `0 / 400`, zasięg strażnika `4`. Przebieg kończy się **zielonym** `INTRUZ DOTARŁ DO CELU — tick 40`. W panelu zdarzeń widać pełny cykl `SUSPICION` → `RETURN` → `PATROL`.
-- [ ] `3` — **Limit ticków**: HUD pokazuje `SCENARIUSZ: LIMIT TICKÓW`, tick `0 / 20`. Przebieg kończy się **pomarańczowym** `LIMIT TICKÓW WYCZERPANY — tick 20`. W logu **nie ma** zdarzeń `DETECTED` ani `SUCCESS`.
+Sesja ma zmierzyć to, czego testy nie widzą: **czy gracz rozumie, co się stało, i czy chce spróbować jeszcze raz**.
 
-## Przełączanie wariantów
+---
 
-- [ ] Aktywny wariant ma wypełniony znacznik `●` na przycisku, pozostałe `○`.
-- [ ] Zmiana wariantu w trakcie automatycznego przebiegu zatrzymuje go i restartuje.
-- [ ] Po zmianie wariantu komunikat końcowy poprzedniego przebiegu **natychmiast znika** i wraca `incydent w toku`.
-- [ ] Po zmianie wariantu panel zdarzeń jest pusty, tick `0`, status `PAUSED`.
-- [ ] Limit ticków w HUD odpowiada wybranemu wariantowi (`400` albo `20`).
-- [ ] **R** restartuje **ten sam** wariant, nie wraca do wykrycia.
-- [ ] Przyciski robią dokładnie to samo co klawisze.
+## Historia
 
-## Restart
-
-- [ ] **R** ustawia tick na `0`, status na `PAUSED`, komunikat końcowy na `incydent w toku`.
-- [ ] Panel zdarzeń jest pusty.
-- [ ] Aktorzy wracają na pozycje startowe.
-- [ ] Reset jest natychmiastowy — poniżej 20 sekund z perspektywy testera.
-- [ ] Dwudziesty restart wygląda identycznie jak pierwszy.
-
-## Tempo podglądu
-
-Tempo zmienia wyłącznie odstęp między krokami. Wynik przebiegu musi być identyczny w każdym tempie.
-
-- [ ] Po starcie HUD pokazuje `tempo: 1×   [Normalnie]`, aktywny przycisk `● Normalnie 1×`.
-- [ ] `[` przełącza na `0,5×  [Wolno]`, `]` na `2×  [Szybko]`; marker `●` wędruje za wyborem.
-- [ ] `[` przy 0,5× zostaje na 0,5×; `]` przy 2× zostaje na 2×.
-- [ ] Przyciski tempa działają identycznie jak klawisze.
-
-Dla **każdego** z trzech wariantów (`1`, `2`, `3`):
-
-- [ ] Przy 0,5× da się zobaczyć przejście `SUSPICION → ALARM` — w wariancie wykrycia zmianę koloru strażnika i stożka między tickiem 37 a 38.
-- [ ] W wariancie sukcesu przy 0,5× widać pełny cykl `SUSPICION` → `RETURN` → `PATROL` (ticki 38–40).
-- [ ] Przy 2× przebieg wyraźnie przyspiesza, ale kończy się tym samym wynikiem i tym samym logiem.
-- [ ] `N` wykonuje dokładnie jeden tick niezależnie od ustawionego tempa.
-
-Zachowanie tempa:
-
-- [ ] Zmiana tempa w trakcie przebiegu **nie** resetuje ticka ani nie czyści panelu zdarzeń.
-- [ ] Zmiana tempa w trakcie przebiegu nie wykonuje dodatkowego ticka w chwili przełączenia.
-- [ ] Po `R` wybrane tempo zostaje bez zmian.
-- [ ] Po przełączeniu wariantu `1` / `2` / `3` wybrane tempo zostaje bez zmian.
-- [ ] Po wyniku terminalnym zmiana tempa **nie** wznawia przebiegu — status zostaje `FINISHED`.
-
-## Wyróżnienie decyzji
-
-Cel: tester ma skojarzyć zmianę na planszy z wpisem w logu bez podpowiedzi.
-
-- [ ] Przy zwykłym mijaniu waypointu (ticki 1, 7, 15, 21, 29, 35 w wariancie wykrycia) **nic nie jest wyróżnione** — brak białego obrysu i brak `►` w logu.
-- [ ] W ticku 37 komórka strażnika dostaje biały obrys, a wiersz `SUSPICION` w panelu ma `►`.
-- [ ] W ticku 38 wyróżnione są **dwie** komórki: strażnika i intruza; w logu `►` mają trzy wiersze (`ALARM`, `DETECTED`, `FINISHED`).
-- [ ] Wyróżnienie znika przy następnym ticku.
-- [ ] W wariancie sukcesu przy 0,5× widać kolejno wyróżnione ticki 38 (`SUSPICION`), 39 (`RETURN`), 40 (`PATROL` + `SUCCESS` + `FINISHED`).
-- [ ] Ukrycie panelu zdarzeń klawiszem `L` nie wyłącza wyróżnienia na planszy.
-
-## Oś czasu przebiegu
-
-- [ ] Pod planszą widać pasek z podpisem `tick 0` po lewej i numerem horyzontu po prawej.
-- [ ] W wariantach wykrycia i sukcesu horyzont wynosi `40`, w wariancie limitu `20`.
-- [ ] Biały kursor przesuwa się w prawo z każdym tickiem; przebyta część paska jest jaśniejsza.
-- [ ] Po zakończeniu przebiegu wykrycia widać dwie kreski: pomarańczową (tick 37) i czerwoną (tick 38).
-- [ ] W wariancie sukcesu widać trzy kreski: 38, 39 i czerwoną 40.
-- [ ] W wariancie limitu jedna czerwona kreska na końcu paska (tick 20).
-- [ ] Rutynowe waypointy **nie** mają kresek na osi.
-- [ ] Restart i zmiana wariantu czyszczą oś.
-
-## Cofanie przebiegu
-
-Cofanie nie jest mechanizmem undo — to odtworzenie przebiegu od zera do wskazanego ticka. Działa, bo rdzeń jest deterministyczny.
-
-- [ ] Po zakończeniu wariantu wykrycia (`tick 38`) klawisz `,` cofa do ticka 37.
-- [ ] Status przestaje być `FINISHED`, komunikat końcowy wraca na `incydent w toku`.
-- [ ] Strażnik jest znowu w stanie `SUSPICION`, a jego komórka wyróżniona.
-- [ ] `.` albo `N` doprowadza z powrotem do ticka 38 i **tego samego** wyniku.
-- [ ] Wielokrotne cofanie i odtwarzanie nigdy nie zmienia wyniku ani panelu zdarzeń.
-- [ ] Na ticku 0 `,` nic nie robi, a przycisk `◀ krok` jest wyszarzony.
-- [ ] Cofanie zachowuje wybrany wariant i tempo.
-- [ ] Cofanie zatrzymuje automatyczny przebieg.
-- [ ] Przyciski `◀ krok [,]` i `krok [.] ▶` działają identycznie jak klawisze.
-
-## Przewijanie osi czasu
-
-- [ ] Nad paskiem widać podpis `przebieg: tick N   (kliknij, aby przewinąć)`.
-- [ ] Kliknięcie w połowie paska przewija do ticka `20` (przy horyzoncie 40).
-- [ ] Kliknięcie tuż przed prawym końcem przewija do ticka `38` i pokazuje wynik wykrycia.
-- [ ] Kliknięcie na lewej krawędzi wraca do ticka `0`.
-- [ ] Kliknięcie poza paskiem — na planszy albo w HUD — nic nie przewija.
-- [ ] Trafienie działa też kilka pikseli nad i pod paskiem, nie trzeba celować co do piksela.
-- [ ] `Home` wraca na tick 0, `End` dociąga do wyniku terminalnego.
-- [ ] `End` w wariancie limitu zatrzymuje się na ticku 20, nie na 400.
-- [ ] Przewinięcie zatrzymuje automatyczny przebieg i zachowuje wariant oraz tempo.
-
-## Co jest już sprawdzane automatycznie
-
-Poniższych punktów **nie trzeba** weryfikować okiem — pilnują ich testy w `tests/test_main_scene.gd`:
-
-- każda kontrolka HUD mieści się w viewporcie 1280 × 800;
-- żadne dwie kontrolki HUD nie nachodzą na siebie;
-- plansza i oś czasu nie kolidują ze sobą ani ze słupkiem HUD;
-- panel statusu, legenda i event log używają czcionki o stałej szerokości;
-- kolumny event logu są wyrównane niezależnie od wyróżnienia wiersza.
-
-Playtest ma więc skupić się na tym, czego geometria nie obejmuje: **kontraście, czytelności kolorów i tym, czy interfejs nie przytłacza**.
+- **2026-09-22 — pierwszy przebieg okienkowy L0** (12 punktów, D3D12, 1280 × 800). Punkty 1–11 potwierdzone zrzutami, punkt 12 („czy interfejs nie przytłacza”) oceniony przez właściciela: nie przytłacza. Checklista L0 i jej warianty `1`/`2`/`3` zniknęły z UI w L1-A. Pełna treść jest w historii gita tego pliku (przed L1-E).
