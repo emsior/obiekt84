@@ -1,8 +1,8 @@
 ## Jawne dane jedynego, ręcznie skonfigurowanego incydentu L0.
 ##
 ## Żadna wartość nie jest losowana i nie zależy od czasu systemowego.
-## Konfiguracja incydentu żyje tutaj, a nie w interaktywnym UI planowania —
-## to świadome ograniczenie tej iteracji.
+## Edytor planowania (warstwa prezentacji) zmienia wyłącznie roboczą kopię
+## tych danych i przekazuje ją rdzeniowi przez `Simulation.initialize()`.
 class_name ScenarioL0
 extends RefCounted
 
@@ -61,6 +61,25 @@ static func create() -> ScenarioL0:
 
 	scenario.max_ticks = 400
 
+	return scenario
+
+
+## Dane zagadki L1-A: plan domyślny, który gracz dostaje w fazie planowania.
+##
+## Te same wymiary, trasa intruza, kamera i zasięgi co [method create] — inny jest
+## wyłącznie patrol. Dolny bok prostokąta leży za wysoko: strażnik dostrzega
+## intruza w 32 ticku, gubi go w następnym, wraca do patrolu, a intruz kończy
+## trasę w 40 ticku. Przegrana wynika z ustawienia patrolu, nie z osłabienia
+## strażnika. `create()` zostaje nietknięte — chroni zatwierdzone golden logi.
+static func create_puzzle() -> ScenarioL0:
+	var scenario := create()
+	scenario.guard_waypoints = [
+		Vector2i(10, 4),
+		Vector2i(16, 4),
+		Vector2i(16, 8),
+		Vector2i(10, 8),
+	] as Array[Vector2i]
+	scenario.guard_start = scenario.guard_waypoints[0]
 	return scenario
 
 
@@ -127,6 +146,11 @@ func validate() -> Array[String]:
 		if not grid.is_inside(guard_waypoints[i]):
 			problems.append("guard_waypoints[%d]=%s poza siatką" % [
 				i, _cell_text(guard_waypoints[i])])
+	# Strażnik startuje na pierwszym waypoincie. Edytor przesuwa waypointy,
+	# więc rozjechany start oznaczałby patrol inny niż ten na planszy.
+	if not guard_waypoints.is_empty() and guard_start != guard_waypoints[0]:
+		problems.append("guard_start=%s różni się od guard_waypoints[0]=%s" % [
+			_cell_text(guard_start), _cell_text(guard_waypoints[0])])
 
 	if intruder_route.is_empty():
 		problems.append("intruder_route: pusta trasa — intruz nie miałby pozycji startowej")
@@ -147,6 +171,15 @@ func validate() -> Array[String]:
 		problems.append("camera_facing=%s nie jest kierunkiem kardynalnym" % _cell_text(camera_facing))
 	if camera_range < 0:
 		problems.append("camera_range=%d jest ujemny" % camera_range)
+	# Kamera jest obiektem na planszy: nie stoi na drodze intruza ani na węźle patrolu.
+	var route_index := intruder_route.find(camera_position)
+	if route_index >= 0:
+		problems.append("camera_position=%s stoi na trasie intruza (intruder_route[%d])" % [
+			_cell_text(camera_position), route_index])
+	for i in guard_waypoints.size():
+		if guard_waypoints[i] == camera_position:
+			problems.append("camera_position=%s stoi na guard_waypoints[%d]" % [
+				_cell_text(camera_position), i])
 
 	if max_ticks < 1:
 		problems.append("max_ticks=%d musi być dodatnie" % max_ticks)

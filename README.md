@@ -2,9 +2,9 @@
 
 Gracz projektuje system ochrony tajnego retrofuturystycznego obiektu, uruchamia deterministyczną symulację infiltracji i poprawia zabezpieczenia po analizie wyniku.
 
-To repozytorium zawiera **pionowy wycinek L0**: jeden ręcznie skonfigurowany incydent, którego logika działa deterministycznie bez UI, oraz warstwę prezentacji, która pokazuje decyzje silnika człowiekowi.
+To repozytorium zawiera **pionowy wycinek L0** — incydent, którego logika działa deterministycznie bez UI — oraz **iterację L1-A „PLAN → RUN”**: gracz ustawia patrol strażnika i kamerę, ogląda deterministyczną noc i poprawia plan po wyniku.
 
-**Status: L0 domknięty.** Wszystkie kryteria sukcesu z [docs/MVP_L0.md](docs/MVP_L0.md) są spełnione — determinizm potwierdzony testami headless, interfejs obejrzany i oceniony w działającym oknie.
+**Status:** L0 domknięty — wszystkie kryteria z [docs/MVP_L0.md](docs/MVP_L0.md) spełnione. L1-A zaimplementowana; kryteria i ich stan są w sekcji „L1-A” tego samego dokumentu.
 
 ## Wymagania
 
@@ -24,7 +24,7 @@ Plugin jest w repozytorium świadomie — CI i kolejne sesje nie muszą go pobie
 2. **Import** → wskaż `project.godot` w katalogu tego repozytorium.
 3. GdUnit4 jest już zarejestrowany w `project.godot`; zakładka **gdUnitConsole** pojawia się na dolnym panelu edytora.
 
-## Uruchomienie vertical slice L0
+## Uruchomienie
 
 W edytorze: **F5** (scena główna to `res://scenes/main.tscn`).
 
@@ -34,20 +34,47 @@ Z terminala, podstawiając własną ścieżkę do binarki Godota:
 "%GODOT_BIN%" --path .
 ```
 
-Okno startuje w stanie **PAUSED** na ticku 0, w wariancie wykrycia. Naciśnij **Spację**, żeby uruchomić przebieg, albo **N**, żeby przechodzić tick po ticku. Klawisze `1`, `2`, `3` przełączają wariant incydentu.
+Build Web: <https://emsior.github.io/obiekt84/>.
 
-### Sterowanie
+## Jak grać
+
+Bronisz obiektu przed intruzem, który idzie jawną trasą do celu (żółty znacznik). Masz jednego strażnika z czterema punktami patrolu i jedną kamerę.
+
+1. **PLAN.** Okno startuje w fazie planowania z planem domyślnym. **Plan domyślny przegrywa**: strażnik dostrzega intruza w 32 ticku, ale patrol jest za krótki, gubi go i intruz dociera do celu. Na planszy widać patrol (ponumerowane węzły 1–4 i przerywaną ścieżkę), kamerę, oba stożki widzenia w pozycji startowej i pełną trasę intruza — zanim noc się zacznie, widać, co jest pilnowane.
+   - **przeciągnij węzeł** — przenosi punkt patrolu na komórkę pod kursorem; strażnik zawsze startuje na węźle 1,
+   - **przeciągnij kamerę** — przenosi kamerę,
+   - **klik w kamerę** — obraca ją o 90° zgodnie z ruchem wskazówek zegara.
+
+   Upuszczenie poza planszą, kamery na trasie intruza albo na węźle patrolu, lub węzła na kamerze jest odrzucane: element wraca na miejsce, a pod nagłówkiem przez 2 s widać czerwony powód.
+2. **NOC (RUN).** **Spacja** albo przycisk **Uruchom noc** — przebieg rusza od razu. To deterministyczna symulacja: ten sam plan zawsze daje tę samą noc.
+3. **Wynik.** Zielone `OBIEKT ZABEZPIECZONY` — intruz wykryty, obrona się udała. Czerwone `DANE WYKRADZIONE` — intruz dotarł do celu. **P** albo **Wróć do planu** przenosi z powrotem do planowania **z zachowanym planem** — poprawiasz i odpalasz noc ponownie. Wrócić można też w trakcie nocy.
+
+Grę da się obsłużyć samą myszą; z klawiatury potrzebna jest najwyżej Spacja.
+
+### Sterowanie — plan
+
+| Wejście | Działanie |
+|---|---|
+| przeciągnij węzeł | przeniesienie punktu patrolu |
+| przeciągnij kamerę | przeniesienie kamery |
+| klik w kamerę | obrót kamery o 90° w prawo |
+| Spacja | uruchom noc |
+| `R` | przywróć plan domyślny |
+| `[` / `]` | tempo podglądu nocy: wolniej / szybciej |
+| `F` / `L` | pokaż/ukryj stożki widzenia / panel zdarzeń |
+
+### Sterowanie — noc
 
 | Klawisz | Działanie |
 |---|---|
-| `1` / `2` / `3` | wybór wariantu incydentu |
+| `P` | **wróć do planu** z zachowanym planem |
 | `[` / `]` | tempo podglądu: wolniej / szybciej |
 | Spacja | start / pauza automatycznego przebiegu |
 | `N` albo `.` | jeden tick do przodu |
 | `,` | **jeden tick wstecz** |
 | `Home` / `End` | początek / koniec przebiegu |
 | klik w oś czasu | przewinięcie do wskazanego ticka |
-| `R` | restart **aktualnie wybranego** wariantu |
+| `R` | restart nocy **na tym samym planie** |
 | `F` | pokaż/ukryj stożki widzenia kamery i strażnika |
 | `L` | pokaż/ukryj panel ostatnich zdarzeń |
 | Escape | pauza (powrót do stanu neutralnego) |
@@ -62,37 +89,29 @@ Okno startuje w stanie **PAUSED** na ticku 0, w wariancie wykrycia. Naciśnij **
 
 Tempo zmienia **wyłącznie odstęp czasu** między kolejnymi wywołaniami `Simulation.step()`. Zawartość ticka, ich kolejność, FOV, FSM, event log i wynik pozostają identyczne — przebieg przy 0,5× i 2× daje bit w bit ten sam kanoniczny log. Rdzeń nadal nie widzi czasu rzeczywistego.
 
-`N` zawsze wykonuje dokładnie jeden tick, niezależnie od tempa. Tempo przeżywa restart (`R`) i zmianę wariantu (`1`/`2`/`3`), a po wyniku terminalnym jego zmiana nie wznawia przebiegu.
+`N` zawsze wykonuje dokładnie jeden tick, niezależnie od tempa. Tempo przeżywa restart (`R`) i przejścia między planem a nocą, a po wyniku terminalnym jego zmiana nie wznawia przebiegu.
 
 Wolne tempo jest po to, żeby dało się zobaczyć moment, w którym strażnik podejmuje decyzję: przejście `SUSPICION → ALARM` trwa przy 1× jedną dziesiątą sekundy.
 
-To samo obsługują przyciski w HUD: trzy przyciski wariantu, trzy przyciski tempa oraz **Start**, **Pauza/Wznów** i **Restart**.
+To samo obsługują przyciski w HUD: **Uruchom noc**, **Wróć do planu**, **Plan domyślny**, trzy przyciski tempa oraz **Start**, **Pauza/Wznów**, **Restart** i krok wstecz / naprzód. Przyciski nie przejmują fokusu, więc Spacja zawsze trafia do gry.
 
-### Trzy warianty incydentu
+### Warianty incydentu L0 — wyłącznie w testach
 
-Wszystkie trzy zakończenia silnika L0 można obejrzeć bez edytowania kodu. Warianty **nie zmieniają żadnej reguły gry** — to te same dane z `ScenarioL0.create()`, w dwóch przypadkach z jednym zmienionym polem:
-
-| Wariant | Klawisz | Zmiana danych | Wynik |
-|---|---|---|---|
-| Wykrycie | `1` | brak | `INTRUDER_DETECTED`, tick 38 |
-| Sukces intruza | `2` | `guard_view_range = 4` | `INTRUDER_SUCCESS`, tick 40 |
-| Limit ticków | `3` | `max_ticks = 20` | `TICK_LIMIT`, tick 20 |
-
-Wybór wariantu natychmiast restartuje przebieg: świeże dane, świeża `Simulation`, tick 0, pusty panel zdarzeń, stan `PAUSED`. Aktywny wariant jest oznaczony wypełnionym znacznikiem na przycisku i nazwą w HUD. `R` restartuje wybrany wariant, nie wraca do domyślnego.
+Trzy zakończenia silnika L0 (wykrycie w 38 ticku, sukces intruza w 40, limit ticków w 20) nie są już wybierane z UI — od L1-A ich miejsce zajął edytor planu. Żyją dalej jako golden logi w testach, bo pilnują reguł silnika (patrz „Regresja golden log” niżej).
 
 ### Co widać na ekranie
 
-Plansza 20 × 20 po lewej: ciemna podłoga, obrys granicy, trasa intruza zaznaczona komórka po komórce (przebyty odcinek ma inny odcień), cztery waypointy patrolu z pogrubionym aktualnym celem, żółty marker celu intruza, kamera i strażnik ze znacznikiem kierunku. Stożki widzenia zmieniają kolor razem ze stanem strażnika: żółty w `PATROL`, jaśniejszy w `SUSPICION`, czerwony w `ALARM`.
+Plansza 20 × 20 po lewej: ciemna podłoga, obrys granicy, trasa intruza zaznaczona komórka po komórce (przebyty odcinek ma inny odcień), cztery waypointy patrolu z pogrubionym aktualnym celem, żółty marker celu intruza, kamera i strażnik ze znacznikiem kierunku. Stożki widzenia zmieniają kolor razem ze stanem strażnika: żółty w `PATROL`, jaśniejszy w `SUSPICION`, czerwony w `ALARM`. W fazie planowania nad planszą są dodatkowo numery węzłów 1–4, przerywana ścieżka patrolu (strażnik chodzi najpierw w osi X, potem w osi Y) i obrys przeciąganego elementu.
 
-HUD po prawej: komunikat końcowy (czerwony — wykrycie, zielony — sukces intruza, pomarańczowy — limit ticków), status `PAUSED` / `RUNNING` / `FINISHED`, tick i limit ticków, tempo podglądu, stany strażnika i intruza, legenda sterowania oraz panel jedenastu ostatnich zdarzeń w kolejności chronologicznej.
+HUD po prawej: komunikat końcowy z perspektywy obrońcy (zielony — obiekt zabezpieczony, czerwony — dane wykradzione, pomarańczowy — limit ticków), podtytuł fazy albo czerwony powód odrzuconej edycji, status `PAUSED` / `RUNNING` / `FINISHED`, tick i limit ticków, tempo podglądu, stany strażnika i intruza, legenda sterowania dla bieżącej fazy oraz panel dziesięciu ostatnich zdarzeń w kolejności chronologicznej. W fazie planowania panel statusu pokazuje węzły patrolu, pozycję i kierunek kamery, cel intruza i limit ticków.
 
-**Cofanie i przewijanie.** Klawisz `,` cofa symulację o jeden tick, `Home` i `End` skaczą na początek i koniec przebiegu, a kliknięcie w oś czasu przewija do wskazanego ticka. Nie ma tu historii stanów ani mechanizmu undo — działa to **dzięki determinizmowi rdzenia**: „idź do ticka N" to świeża `Simulation` na tych samych danych i dokładnie N kroków. Ten sam scenariusz zawsze daje ten sam przebieg, więc odtworzony tick jest identyczny z oryginalnym. Po zakończonym incydencie można się cofnąć przed moment wykrycia, zwolnić do 0,5× i obejrzeć decyzję strażnika jeszcze raz — stan przestaje być terminalny i przebieg da się doprowadzić do końca ponownie.
+**Cofanie i przewijanie.** Klawisz `,` cofa symulację o jeden tick, `Home` i `End` skaczą na początek i koniec przebiegu, a kliknięcie w oś czasu przewija do wskazanego ticka. Nie ma tu historii stanów ani mechanizmu undo — działa to **dzięki determinizmowi rdzenia**: „idź do ticka N" to świeża `Simulation` na danych tej nocy (kopii planu z chwili uruchomienia) i dokładnie N kroków. Ten sam scenariusz zawsze daje ten sam przebieg, więc odtworzony tick jest identyczny z oryginalnym. Po zakończonym incydencie można się cofnąć przed moment wykrycia, zwolnić do 0,5× i obejrzeć decyzję strażnika jeszcze raz — stan przestaje być terminalny i przebieg da się doprowadzić do końca ponownie.
 
 **Oś czasu pod planszą.** Pasek pokazuje, gdzie w przebiegu jesteśmy i kiedy coś się działo: pomarańczowe kreski to ticki decyzji, czerwona to zakończenie, biała to bieżący tick. Oś obejmuje domyślnie pierwsze 40 ticków — incydenty L0 kończą się w okolicach 20–40 ticka, a limit scenariusza wynosi 400, więc rozciąganie osi do limitu ścisnęłoby cały przebieg w lewy margines. Gdy przebieg wyjdzie poza horyzont, ten się podwaja.
 
 **Wyróżnienie decyzji.** Gdy w danym ticku wydarzy się coś innego niż rutynowe minięcie waypointu — przejście FSM strażnika, wykrycie przez kamerę, `DETECTED`, `SUCCESS` albo zakończenie przebiegu — komórki podmiotów, których to dotyczy, dostają biały obrys na planszy, a odpowiadające im wpisy w panelu zdarzeń są oznaczone `►`. Dzięki temu widać, że zmiana na mapie i wiersz w logu to ta sama rzecz. Wyróżnienie znika wraz z następnym tickiem, więc przy tempie 0,5× jest wyraźnie czytelne.
 
-Automatyczny przebieg zatrzymuje się sam po osiągnięciu wyniku terminalnego. Restart tworzy świeży scenariusz i świeżą instancję `Simulation` oraz czyści panel zdarzeń.
+Automatyczny przebieg zatrzymuje się sam po osiągnięciu wyniku terminalnego. Restart tworzy świeżą instancję `Simulation` na tym samym planie i czyści panel zdarzeń.
 
 ## Testy headless
 
@@ -116,9 +135,11 @@ $env:GODOT_BIN = 'C:\sciezka\do\Godot_v4.7.2-stable_win64_console.exe'
 "%GODOT_BIN%" --headless --path . -s res://addons/gdUnit4/bin/GdUnitCmdTool.gd -a tests --ignoreHeadlessMode
 ```
 
-Wynik ostatniego uruchomienia: **107 przypadków testowych, 0 błędów, 0 failures, 0 flaky, 0 skipped, 0 orphans, exit code 0.**
+Wynik ostatniego uruchomienia: **143 przypadki testowe, 0 błędów, 0 failures, 0 flaky, 0 skipped, 0 orphans, exit code 0.**
 
-Flaga `--ignoreHeadlessMode` jest wymagana, ponieważ GdUnit4 domyślnie odmawia pracy w trybie headless. Nasze testy nie używają `InputEvent`, więc to ograniczenie ich nie dotyczy.
+Po dodaniu nowego skryptu z `class_name` (np. `PlanEditor`) trzeba raz odświeżyć cache klas globalnych: `"%GODOT_BIN%" --headless --path . --import`. CI robi ten krok przed testami.
+
+Flaga `--ignoreHeadlessMode` jest wymagana, ponieważ GdUnit4 domyślnie odmawia pracy w trybie headless. Nasze testy nie symulują wejścia przez `Input` — kilka testów sceny tworzy `InputEvent` i podaje go wprost do `_unhandled_input` koordynatora, więc to ograniczenie ich nie dotyczy.
 
 ### Komenda alternatywna — runner dostarczony z GdUnit4 (zweryfikowana lokalnie)
 
@@ -132,17 +153,21 @@ Raporty XML i HTML lądują w `reports/` (katalog ignorowany przez Git).
 
 ### Regresja golden log
 
-`tests/test_l0_golden_log.gd` porównuje bieżące przebiegi L0 z **trzema** zatwierdzonymi
-artefaktami — po jednym na każdy terminalny wynik silnika:
+`tests/test_l0_golden_log.gd` porównuje bieżące przebiegi z **pięcioma** zatwierdzonymi
+artefaktami — po jednym na każdy terminalny wynik silnika L0 i dwa dla zagadki L1-A:
 
 | Fixture | Ścieżka | Outcome |
 |---|---|---|
-| `tests/fixtures/l0_incident_golden_log.txt` | wykrycie intruza przez strażnika | `INTRUDER_DETECTED` |
-| `tests/fixtures/l0_success_golden_log.txt` | intruz kończy trasę | `INTRUDER_SUCCESS` |
-| `tests/fixtures/l0_tick_limit_golden_log.txt` | wyczerpanie limitu ticków | `TICK_LIMIT` |
+| `tests/fixtures/l0_incident_golden_log.txt` | wykrycie intruza przez strażnika | `INTRUDER_DETECTED`, tick 38 |
+| `tests/fixtures/l0_success_golden_log.txt` | intruz kończy trasę | `INTRUDER_SUCCESS`, tick 40 |
+| `tests/fixtures/l0_tick_limit_golden_log.txt` | wyczerpanie limitu ticków | `TICK_LIMIT`, tick 20 |
+| `tests/fixtures/l0_puzzle_default_golden_log.txt` | plan domyślny L1-A przegrywa | `INTRUDER_SUCCESS`, tick 40 |
+| `tests/fixtures/l0_puzzle_solution_golden_log.txt` | plan referencyjny: wykrycie przez kamerę | `INTRUDER_DETECTED`, tick 36 |
 
 Warianty sukcesu i limitu to te same dane z `ScenarioL0.create()` z jednym świadomie
 zmienionym polem (odpowiednio: mniejszy zasięg widzenia strażnika, krótszy `max_ticks`).
+Plan domyślny to `ScenarioL0.create_puzzle()`. Plan referencyjny jest zapisany w teście
+jawnie: te same cztery węzły patrolu i kamera przeniesiona na `(17,9)`, skierowana w dół.
 Wynik wynika z normalnej pracy silnika, nie z wymuszenia. Fixture'y chronią przed zmianą
 reguł, której nie wykryje test 50/50 — bo tamten dowodzi tylko, że przebiegi są wzajemnie
 identyczne, a nie że nadal zgadzają się z zatwierdzonym zachowaniem.
@@ -165,8 +190,9 @@ najpierw ustal, czy zmiana zachowania była zamierzona.
 `tests/test_scenario.gd` pilnuje dwóch rzeczy, których nie widać w samym przebiegu incydentu:
 
 - **`ScenarioL0.validate()` zgłasza błędne dane wejściowe** — waypoint albo trasę poza siatką,
-  dziurę lub skos w trasie, niekardynalny kierunek patrzenia, ujemny zasięg, zerowy `max_ticks`.
-  Zwraca **wszystkie** problemy naraz, nie tylko pierwszy. `Simulation.initialize()` zatrzymuje
+  dziurę lub skos w trasie, niekardynalny kierunek patrzenia, ujemny zasięg, zerowy `max_ticks`,
+  start strażnika różny od pierwszego waypointu, kamerę na trasie intruza albo na waypoincie.
+  Zwraca **wszystkie** problemy naraz, nie tylko pierwszy. Edytor planu pokazuje graczowi pierwszy z nich. `Simulation.initialize()` zatrzymuje
   się na niepoprawnych danych jawnym komunikatem, zamiast uruchamiać bezwartościowy przebieg.
 - **`ScenarioL0.duplicate_data()` kopiuje każde pole.** Test przechodzi po właściwościach klasy
   przez refleksję, więc nowe pole, którego ktoś zapomni dopisać do kopii, zapala test — zamiast
@@ -186,11 +212,17 @@ z komunikatem wskazującym nazwę pola.
 - UI: sterowanie klawiaturą i przyciskami, HUD ze stanem, komunikatem końcowym i panelem zdarzeń.
 - Testy GdUnit4 uruchamiane bez otwierania okna gry.
 
-Bieżący incydent kończy się w 38 ticku wykryciem intruza przez strażnika, trzy komórki przed końcem jego trasy.
+Incydent z `ScenarioL0.create()` kończy się w 38 ticku wykryciem intruza przez strażnika, trzy komórki przed końcem jego trasy.
+
+## Zakres L1-A
+
+- Faza PLAN: edytor czterech węzłów patrolu (liczba stała) i kamery — przeciąganie i obrót kamery. Edytor zmienia wyłącznie roboczą kopię danych scenariusza; rdzeń dostaje ją przez `Simulation.initialize()` i nic nie wie o UI.
+- Faza RUN: ta sama deterministyczna noc co w L0, z pełnym sterowaniem przebiegiem. Powrót do planu zachowuje plan.
+- Plan domyślny przegrywa, plan referencyjny wygrywa — oba pilnowane golden logami.
 
 ## Świadome ograniczenia tej iteracji
 
-- **Konfiguracja incydentu jest definiowana w danych scenariusza** (`scripts/core/scenario_l0.gd`), a **nie przez interaktywne UI planowania.** Nie ma edytora ustawiania kamer ani waypointów — to celowa decyzja, nie brak.
+- **Edytor zmienia tylko patrol i kamerę.** Trasa intruza, zasięgi, liczba waypointów i limit ticków pozostają danymi w `scripts/core/scenario_l0.gd`. Planu nie da się zapisać.
 - Brak pathfindingu: intruz ma kompletną listę komórek, strażnik chodzi regułą „najpierw oś X, potem oś Y". Żadnego AStar, NavMesh ani `NavigationAgent2D`.
 - Brak ścian i pól zablokowanych: w danych scenariusza nie istnieje takie pojęcie, więc nie ma też okluzji ani algorytmu linii widzenia — FOV to czysty test stożka.
 - Brak dźwięku, animacji, shaderów, zapisu, ekonomii, metaprogresji i generowania proceduralnego.
@@ -202,11 +234,11 @@ Bieżący incydent kończy się w 38 ticku wykryciem intruza przez strażnika, t
 ```text
 scripts/core/        rdzeń domenowy (RefCounted, zero node'ów)
 scripts/actors/      FSM strażnika i intruza, kalkulator FOV
-scripts/presentation/ widok poziomu, widok podmiotu, adapter czasu
+scripts/presentation/ widok poziomu, widok podmiotu, edytor planu, koordynator faz i czasu
 scripts/ui/          HUD
 scenes/              main.tscn, level_l0.tscn
 tests/               testy GdUnit4
-tests/fixtures/      trzy zatwierdzone golden logi L0 (wykrycie, sukces, limit)
+tests/fixtures/      pięć zatwierdzonych golden logów (trzy wyniki L0, dwa plany L1-A)
 docs/                MVP_L0, ARCHITECTURE, DECISIONS, PLAYTEST
 addons/gdUnit4/      vendorowany plugin w przypiętej wersji 6.2.1
 ```

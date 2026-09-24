@@ -18,7 +18,7 @@ zero inputu                            czyta klawiaturę i mysz
 
 Przepływ jest jednokierunkowy. Rdzeń nie wie, że istnieje scena. Prezentacja nie może zapisać niczego do rdzenia: snapshot i event log są kopiami, a jedyne wejścia zapisujące to `initialize()` i `step()`.
 
-`Simulation.reset()` istnieje w API rdzenia i jest pokryty testami core, ale **prezentacja go nie używa** — restart, zmiana wariantu i przewijanie budują świeżą `Simulation` przez `initialize()`. Powód w sekcji o przewijaniu niżej.
+`Simulation.reset()` istnieje w API rdzenia i jest pokryty testami core, ale **prezentacja go nie używa** — uruchomienie nocy, restart i przewijanie budują świeżą `Simulation` przez `initialize()`. Powód w sekcji o przewijaniu niżej.
 
 ## Źródło prawdy
 
@@ -84,6 +84,8 @@ do waypointu poza siatką, intruz przeskakiwałby komórki.
 | kierunki patrzenia kardynalne | FOV zakłada dokładnie jedną oś |
 | kolejne komórki trasy różnią się o jedną komórkę w osi | kontrakt „najwyżej jeden krok na tick" |
 | nieujemne zasięgi widzenia, dodatni `max_ticks` | inaczej przebieg nie miałby końca albo FOV sensu |
+| `guard_start` równy `guard_waypoints[0]` | edytor przesuwa waypointy; rozjechany start dałby patrol inny niż ten na planszy |
+| kamera nie stoi na trasie intruza ani na waypoincie | kamera jest obiektem na planszy, nie może zajmować komórki drogi ani węzła patrolu |
 
 Walidacja zbiera **wszystkie** problemy naraz. `Simulation.initialize()` zatrzymuje się na
 niepoprawnych danych, zamiast uruchamiać bezwartościowy przebieg. Pokrycie: `tests/test_scenario.gd`.
@@ -123,24 +125,25 @@ Nie opieramy dowodu determinizmu na domyślnej serializacji `Dictionary`. Snapsh
 
 Rdzeń trzyma własną kopię scenariusza, więc reset zawsze odtwarza te same dane wejściowe niezależnie od tego, co stało się z obiektem przekazanym do `initialize()`.
 
-`reset()` jest używany przez testy rdzenia. **Warstwa prezentacji go nie woła** — Restart, zmiana wariantu i przewijanie budują świeżą `Simulation` przez `initialize()`, bo wariant może wnieść inne dane wejściowe, a `reset()` z definicji wraca do danych, z którymi instancja została zainicjalizowana.
+`reset()` jest używany przez testy rdzenia. **Warstwa prezentacji go nie woła** — uruchomienie nocy, restart i przewijanie budują świeżą `Simulation` przez `initialize()`, bo każda noc może wnieść inny plan gracza, a `reset()` z definicji wraca do danych, z którymi instancja została zainicjalizowana.
 
 ## Warstwa prezentacji
 
-Cztery skrypty, jasno rozdzielone odpowiedzialnościami:
+Pięć skryptów, jasno rozdzielonych odpowiedzialnościami:
 
 | Plik | Odpowiedzialność |
 |---|---|
-| `scripts/presentation/simulation_runner.gd` | koordynator: właściciel wariantu, tempa, wejścia i cyklu życia `Simulation` |
+| `scripts/presentation/simulation_runner.gd` | koordynator: właściciel fazy PLAN/RUN, tempa, wejścia i cyklu życia `Simulation` |
+| `scripts/presentation/plan_editor.gd` | edytor planu: właściciel roboczej kopii `ScenarioL0` (draftu), przeciąganie waypointów i kamery, obrót kamery; rysuje ścieżkę patrolu |
 | `scripts/presentation/level_view.gd` | rysuje planszę, aktorów, trasę i stożki ze snapshotu |
 | `scripts/presentation/timeline_view.gd` | rysuje oś czasu przebiegu; odwzorowuje piksel na tick |
 | `scripts/ui/hud.gd` | pasywny HUD: wyświetla to, co dostanie, i emituje intencje sygnałami |
 
-Tylko koordynator dotyka `Simulation`. Widoki i HUD dostają gotowe dane i nie decydują o niczym: `level_view` dostaje listę komórek do wyróżnienia, `timeline_view` listę ticków ze zdarzeniami, HUD słownik `ui_state`. HUD nie zna FSM ani reguł — nie interpretuje zdarzeń, tylko oznacza wiersze wskazane przez koordynatora.
+Tylko koordynator dotyka `Simulation`. Edytor planu nie zna `Simulation` ani snapshotu — zmienia draft i ogłasza zmianę albo odrzucenie sygnałem. Widoki i HUD dostają gotowe dane i nie decydują o niczym: `level_view` dostaje listę komórek do wyróżnienia, `timeline_view` listę ticków ze zdarzeniami, HUD słownik `ui_state`. HUD nie zna FSM ani reguł — nie interpretuje zdarzeń, tylko oznacza wiersze wskazane przez koordynatora.
 
-**Wejście** (klawiatura i mysz) obsługuje wyłącznie `simulation_runner.gd` w `_unhandled_input`. Rdzeń nigdy nie widzi inputu.
+**Wejście** (klawiatura i mysz) obsługuje wyłącznie `simulation_runner.gd` w `_unhandled_input`. W fazie PLAN zamienia piksele na komórki i woła `begin_drag` / `drag_to` / `end_drag` edytora; edytor nie widzi `InputEvent`. Rdzeń nigdy nie widzi inputu. Korzeń HUD ma `mouse_filter = IGNORE`, żeby nie przechwytywał kliknięć nad planszą.
 
-**Warianty incydentu** to wyłącznie różne dane wejściowe: świeże `ScenarioL0.create()` z jednym zmienionym polem (`guard_view_range` albo `max_ticks`). Konfiguracja żyje w koordynatorze, bo potrzebuje jej tylko prezentacja — rdzeń nie dostał API wariantów.
+**Fazy PLAN i RUN** (L1-A, `docs/DECISIONS.md` 2026-09-24). W PLAN edytor zmienia draft; każda zmiana powstaje na kopii i przechodzi przez `ScenarioL0.validate()`, więc draft jest zawsze poprawny. Podgląd planu to osobna, nigdy nie krokowana `Simulation` zainicjalizowana kopią draftu — widok czyta z niej snapshot tak samo jak w nocy. Uruchomienie nocy kopiuje draft i przekazuje go przez `initialize()`; przewijanie i restart odtwarzają noc z tej kopii, więc edycja draftu nie może zmienić trwającej nocy. Rdzeń nie ma API edycji ani pojęcia fazy. Warianty incydentu L0 żyją wyłącznie w testach golden log.
 
 **Tempo podglądu** zmienia wyłącznie `wait_time` Timera. Liczba i kolejność wywołań `step()` są bez zmian, więc przebieg przy 0,5× i 2× daje identyczny kanoniczny log.
 
@@ -150,7 +153,7 @@ Tylko koordynator dotyka `Simulation`. Widoki i HUD dostają gotowe dane i nie d
 
 Działa to **wyłącznie dzięki determinizmowi rdzenia**: ten sam scenariusz zawsze daje ten sam przebieg, więc odtworzony tick jest identyczny z oryginalnym. To jedyne miejsce w UI, które korzysta z kontraktu determinizmu wprost — i jednocześnie jego praktyczny test: gdyby rdzeń przestał być deterministyczny, przewijanie zaczęłoby pokazywać inny przebieg niż ten, który tester przed chwilą oglądał.
 
-Przewijanie zatrzymuje automatyczny przebieg, zachowuje wariant i tempo, a cofnięcie się przed tick terminalny zdejmuje stan końcowy.
+Przewijanie zatrzymuje automatyczny przebieg, zachowuje plan nocy i tempo, a cofnięcie się przed tick terminalny zdejmuje stan końcowy.
 
 ## Jak działa test deterministyczny
 

@@ -12,9 +12,10 @@ const HARD_TICK_LIMIT := 500
 
 ## Jeden pełny, niezależny przebieg. Zwraca wyłącznie kanoniczne łańcuchy —
 ## instancja symulacji nie opuszcza tej funkcji i jest zwalniana po powrocie.
-func _run_once() -> Dictionary:
+## [param puzzle] wybiera dane zagadki L1-A zamiast `ScenarioL0.create()`.
+func _run_once(puzzle := false) -> Dictionary:
 	var simulation := Simulation.new()
-	simulation.initialize(ScenarioL0.create())
+	simulation.initialize(ScenarioL0.create_puzzle() if puzzle else ScenarioL0.create())
 
 	var steps := 0
 	while not simulation.is_finished() and steps < HARD_TICK_LIMIT:
@@ -57,7 +58,16 @@ func _describe_diff(run_index: int, label: String, expected: String, actual: Str
 ## 50 niezależnych uruchomień identycznego scenariusza daje identyczny
 ## kanoniczny event log oraz identyczny końcowy snapshot.
 func test_fifty_independent_runs_are_identical() -> void:
-	var reference := _run_once()
+	_assert_fifty_independent_runs_are_identical(false)
+
+
+## To samo dla planu domyślnego L1-A — danych, od których gracz zaczyna.
+func test_fifty_independent_puzzle_runs_are_identical() -> void:
+	_assert_fifty_independent_runs_are_identical(true)
+
+
+func _assert_fifty_independent_runs_are_identical(puzzle: bool) -> void:
+	var reference := _run_once(puzzle)
 
 	assert_bool(bool(reference["finished"])) \
 		.append_failure_message("przebieg referencyjny nie osiagnal stanu terminalnego") \
@@ -67,7 +77,7 @@ func test_fifty_independent_runs_are_identical() -> void:
 		.is_not_empty()
 
 	for run_index in range(1, RUN_COUNT):
-		var current := _run_once()
+		var current := _run_once(puzzle)
 
 		assert_str(String(current["log"])) \
 			.append_failure_message(_describe_diff(

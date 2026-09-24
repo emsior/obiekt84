@@ -1,10 +1,15 @@
 ## Test integracyjny sceny głównej.
 ##
-## To jedyne miejsce w zestawie testów, w którym powstają node'y — i jedyne
-## odpowiedzialne za kontrolę orphan nodes. Rdzeń nie tworzy node'ów w ogóle.
+## To jedyne miejsce w zestawie testów (obok `test_plan_editor.gd`), w którym
+## powstają node'y — i jedyne odpowiedzialne za kontrolę orphan nodes. Rdzeń
+## nie tworzy node'ów w ogóle.
 ##
 ## Ticki są wyzwalane przez jawną emisję sygnału Timera, a nie przez czekanie na
 ## czas rzeczywisty: kontrakt adaptera brzmi "jeden timeout to jeden step()".
+##
+## Scena startuje w fazie PLAN z planem domyślnym zagadki L1-A
+## (`ScenarioL0.create_puzzle()`), który przegrywa w 40 ticku: strażnik dostrzega
+## intruza w 32, gubi w 33, wraca do patrolu w 34.
 extends GdUnitTestSuite
 
 const MAIN_SCENE := "res://scenes/main.tscn"
@@ -16,10 +21,14 @@ const VIEWPORT_WIDTH := 1280.0
 const VIEWPORT_HEIGHT := 800.0
 const HUD_COLUMN_LEFT := 620.0
 
-## Indeksy wariantow incydentu (enum ScenarioVariant w simulation_runner.gd).
-const VARIANT_DETECTION := 0
-const VARIANT_SUCCESS := 1
-const VARIANT_TICK_LIMIT := 2
+## Przebieg planu domyslnego (tests/fixtures/l0_puzzle_default_golden_log.txt).
+const PUZZLE_TERMINAL_TICK := 40
+const PUZZLE_DECISION_TICKS: Array[int] = [32, 33, 34, 40]
+const PUZZLE_SUSPICION_TICK := 32
+
+## Indeksy faz (enum Phase w simulation_runner.gd).
+const PHASE_PLAN := 0
+const PHASE_RUN := 1
 
 
 func _count_nodes(node: Node) -> int:
@@ -39,24 +48,56 @@ func _fire_ticks(scene: Node, count: int) -> void:
 		timer.timeout.emit()
 
 
-func test_main_scene_instantiates_with_initial_state() -> void:
+## Uruchomienie nocy i natychmiastowa pauza — testy krokują ręcznie.
+func _enter_run_paused(scene: Node) -> void:
+	scene.call("start_run")
+	scene.call("pause")
+
+
+func _press_key(scene: Node, keycode: Key) -> void:
+	var key := InputEventKey.new()
+	key.keycode = keycode
+	key.pressed = true
+	scene.call("_unhandled_input", key)
+
+
+func test_main_scene_starts_in_plan_phase() -> void:
 	var runner := scene_runner(MAIN_SCENE)
 	await runner.simulate_frames(1)
 	var scene := runner.scene()
 
-	var simulation := _simulation_of(scene)
-	assert_object(simulation).is_not_null()
-	assert_int(simulation.get_tick()).is_equal(0)
-	assert_bool(simulation.is_finished()).is_false()
+	assert_int(int(scene.call("current_phase"))).is_equal(PHASE_PLAN)
+	assert_object(_simulation_of(scene)) \
+		.append_failure_message("w fazie planowania nie powinno byc symulacji nocy") \
+		.is_null()
 	assert_bool(bool(scene.get("_running"))).is_false()
+	assert_bool((scene.get_node("PlanEditor") as PlanEditor).visible).is_true()
 
 	var status := scene.get_node("HudLayer/Hud/StatusLabel") as Label
-	assert_str(status.text).contains("tick:")
-	assert_str(status.text).contains(Hud.STATUS_PAUSED)
+	assert_str(status.text).contains("FAZA: PLAN")
+	var legend := scene.get_node("HudLayer/Hud/LegendLabel") as Label
+	assert_str(legend.text).contains("przeciągnij węzeł — patrol")
+	assert_str(legend.text).contains("Spacja — uruchom noc")
 
-	# Wynik terminalny ma wlasna etykiete, nie panel statusu.
 	var outcome := scene.get_node("HudLayer/Hud/OutcomeLabel") as Label
 	assert_str(outcome.text).is_not_empty()
+
+
+## Podgląd planu to snapshot ticka 0 na danych draftu — plansza pokazuje to,
+## co rdzeń dostanie na starcie nocy.
+func test_plan_preview_matches_puzzle_start_state() -> void:
+	var runner := scene_runner(MAIN_SCENE)
+	await runner.simulate_frames(1)
+	var scene := runner.scene()
+
+	var puzzle := ScenarioL0.create_puzzle()
+	var snapshot: Dictionary = scene.call("plan_preview_snapshot")
+	assert_int(int(snapshot["tick"])).is_equal(0)
+	assert_array(snapshot["guard_waypoints"]).is_equal(puzzle.guard_waypoints)
+	assert_vector(snapshot["guard_position"]).is_equal(puzzle.guard_start)
+	assert_vector(snapshot["camera_position"]).is_equal(puzzle.camera_position)
+	assert_vector(snapshot["camera_facing"]).is_equal(puzzle.camera_facing)
+	assert_array(snapshot["intruder_route"]).is_equal(puzzle.intruder_route)
 
 
 func test_start_pause_resume_restart_controls() -> void:
@@ -64,12 +105,15 @@ func test_start_pause_resume_restart_controls() -> void:
 	await runner.simulate_frames(1)
 	var scene := runner.scene()
 	var hud := scene.get_node("HudLayer/Hud") as Hud
-	var simulation := _simulation_of(scene)
 
-	hud.start_requested.emit()
+	# Przycisk "Uruchom noc" przechodzi do RUN i od razu uruchamia przebieg.
+	hud.run_requested.emit()
+	assert_int(int(scene.call("current_phase"))).is_equal(PHASE_RUN)
 	assert_bool(bool(scene.get("_running"))) \
-		.append_failure_message("Start nie uruchomil odtwarzania") \
+		.append_failure_message("uruchomienie nocy nie wystartowalo odtwarzania") \
 		.is_true()
+	var simulation := _simulation_of(scene)
+	assert_int(simulation.get_tick()).is_equal(0)
 
 	_fire_ticks(scene, 3)
 	assert_int(simulation.get_tick()).is_equal(3)
@@ -90,7 +134,7 @@ func test_start_pause_resume_restart_controls() -> void:
 	_fire_ticks(scene, 2)
 	assert_int(simulation.get_tick()).is_equal(5)
 
-	# Restart podstawia swieza instancje Simulation na swiezym scenariuszu,
+	# Restart podstawia swieza instancje Simulation na tym samym planie,
 	# wiec stan trzeba odczytac ponownie ze sceny.
 	hud.restart_requested.emit()
 	var after_restart := _simulation_of(scene)
@@ -98,6 +142,10 @@ func test_start_pause_resume_restart_controls() -> void:
 	assert_int(after_restart.get_tick()).is_equal(0)
 	assert_array(after_restart.get_event_log()).is_empty()
 	assert_bool(after_restart.is_finished()).is_false()
+
+	# Start z HUD w pauzie wznawia przebieg.
+	hud.start_requested.emit()
+	assert_bool(bool(scene.get("_running"))).is_true()
 
 
 ## 20 cykli Start/Pauza/Restart: stan po każdym resecie musi być identyczny
@@ -108,6 +156,7 @@ func test_twenty_restart_cycles_are_stable() -> void:
 	var scene := runner.scene()
 	var hud := scene.get_node("HudLayer/Hud") as Hud
 
+	_enter_run_paused(scene)
 	var initial_snapshot := _simulation_of(scene).get_canonical_snapshot()
 	var initial_node_count := _count_nodes(scene)
 
@@ -142,6 +191,7 @@ func test_single_step_updates_hud() -> void:
 	var scene := runner.scene()
 	var status := scene.get_node("HudLayer/Hud/StatusLabel") as Label
 
+	_enter_run_paused(scene)
 	var before := status.text
 	scene.call("single_step")
 
@@ -151,22 +201,23 @@ func test_single_step_updates_hud() -> void:
 		.is_not_equal(before)
 
 
-## Dymny test: wynik terminalny zatrzymuje automatyczny przebieg.
+## Dymny test: wynik terminalny zatrzymuje automatyczny przebieg, a komunikat
+## mówi z perspektywy obrońcy — plan domyślny przegrywa.
 func test_terminal_outcome_stops_auto_run() -> void:
 	var runner := scene_runner(MAIN_SCENE)
 	await runner.simulate_frames(1)
 	var scene := runner.scene()
 	var hud := scene.get_node("HudLayer/Hud") as Hud
 
-	hud.start_requested.emit()
+	hud.run_requested.emit()
 	assert_bool(bool(scene.get("_running"))).is_true()
 
-	# Incydent domyslny konczy sie wykryciem; dajemy zapas timeoutow.
+	# Plan domyslny konczy sie w 40 ticku; dajemy zapas timeoutow.
 	_fire_ticks(scene, 60)
 
 	var simulation := _simulation_of(scene)
 	assert_bool(simulation.is_finished()) \
-		.append_failure_message("incydent nie domknal sie") \
+		.append_failure_message("noc nie domknela sie") \
 		.is_true()
 	assert_bool(bool(scene.get("_running"))) \
 		.append_failure_message("automatyczny przebieg nie zatrzymal sie po wyniku terminalnym") \
@@ -177,8 +228,9 @@ func test_terminal_outcome_stops_auto_run() -> void:
 
 	var outcome := scene.get_node("HudLayer/Hud/OutcomeLabel") as Label
 	assert_str(outcome.text) \
-		.append_failure_message("komunikat koncowy nie pojawil sie w HUD") \
-		.is_not_empty()
+		.append_failure_message("komunikat przegranej obroncy nie pojawil sie w HUD") \
+		.is_equal("DANE WYKRADZIONE  —  tick %d  ·  wróć do planu [P]" % PUZZLE_TERMINAL_TICK)
+	assert_that(outcome.get_theme_color("font_color")).is_equal(Hud.COLOR_BREACHED)
 
 
 ## Dymny test: przełączniki prezentacji zmieniają stan widoku, nie rdzenia.
@@ -188,6 +240,7 @@ func test_overlay_and_log_toggles_change_presentation_state() -> void:
 	var scene := runner.scene()
 	var level_view := scene.get_node("LevelL0") as LevelView
 	var log_label := scene.get_node("HudLayer/Hud/LogLabel") as Label
+	_enter_run_paused(scene)
 	var tick_before := _simulation_of(scene).get_tick()
 
 	assert_bool(level_view.is_overlay_visible()).is_true()
@@ -207,80 +260,19 @@ func test_overlay_and_log_toggles_change_presentation_state() -> void:
 		.is_equal(tick_before)
 
 
-## Dymny test: każdy wariant startuje od świeżych danych o oczekiwanej konfiguracji.
-## Warianty to wyłącznie inne dane wejściowe tego samego silnika L0.
-func test_selecting_each_variant_restarts_with_expected_configuration() -> void:
-	var runner := scene_runner(MAIN_SCENE)
-	await runner.simulate_frames(1)
-	var scene := runner.scene()
-
-	var expected := [
-		{"variant": VARIANT_DETECTION, "view_range": 6, "max_ticks": 400},
-		{"variant": VARIANT_SUCCESS, "view_range": 4, "max_ticks": 400},
-		{"variant": VARIANT_TICK_LIMIT, "view_range": 6, "max_ticks": 20},
-	]
-
-	for case: Dictionary in expected:
-		scene.call("select_variant", case["variant"])
-		var snapshot := _simulation_of(scene).get_state_snapshot()
-
-		assert_int(int(snapshot["tick"])) \
-			.append_failure_message("wariant %d: tick po wyborze" % int(case["variant"])) \
-			.is_equal(0)
-		assert_int(int(snapshot["guard_view_range"])) \
-			.append_failure_message("wariant %d: zasieg widzenia straznika" % int(case["variant"])) \
-			.is_equal(int(case["view_range"]))
-		assert_int(int(snapshot["max_ticks"])) \
-			.append_failure_message("wariant %d: limit tickow" % int(case["variant"])) \
-			.is_equal(int(case["max_ticks"]))
-		assert_bool(bool(scene.get("_running"))) \
-			.append_failure_message("wariant %d: przebieg nie jest w stanie PAUSED" % int(case["variant"])) \
-			.is_false()
-
-
-## Dymny test: zmiana wariantu kasuje wynik terminalny i panel zdarzeń.
-func test_variant_selection_clears_terminal_state_and_event_log() -> void:
+## Restart nocy odtwarza ten sam plan gracza, nie wraca do planu domyślnego.
+func test_restart_preserves_player_plan() -> void:
 	var runner := scene_runner(MAIN_SCENE)
 	await runner.simulate_frames(1)
 	var scene := runner.scene()
 	var hud := scene.get_node("HudLayer/Hud") as Hud
+	var editor := scene.get_node("PlanEditor") as PlanEditor
 
-	hud.start_requested.emit()
-	_fire_ticks(scene, 60)
+	assert_bool(editor.begin_drag(Vector2i(16, 8))).is_true()
+	editor.drag_to(Vector2i(16, 10))
+	assert_bool(editor.end_drag()).is_true()
 
-	var before := _simulation_of(scene)
-	assert_bool(before.is_finished()) \
-		.append_failure_message("wariant domyslny nie domknal sie") \
-		.is_true()
-	assert_array(before.get_event_log()).is_not_empty()
-
-	scene.call("select_variant", VARIANT_TICK_LIMIT)
-	var after := _simulation_of(scene)
-
-	assert_bool(before == after) \
-		.append_failure_message("wybor wariantu nie utworzyl nowej instancji Simulation") \
-		.is_false()
-	assert_int(after.get_tick()).is_equal(0)
-	assert_str(after.get_outcome()).is_equal(SimulationState.OUTCOME_NONE)
-	assert_array(after.get_event_log()) \
-		.append_failure_message("panel zdarzen nie zostal wyczyszczony") \
-		.is_empty()
-	assert_bool(bool(scene.get("_running"))).is_false()
-
-	var outcome_label := scene.get_node("HudLayer/Hud/OutcomeLabel") as Label
-	assert_str(outcome_label.text) \
-		.append_failure_message("komunikat terminalny poprzedniego wariantu nie zniknal") \
-		.not_contains("WYKRYTY")
-
-
-## Dymny test: restart odtwarza wybrany wariant, nie wraca do domyślnego.
-func test_restart_preserves_selected_variant() -> void:
-	var runner := scene_runner(MAIN_SCENE)
-	await runner.simulate_frames(1)
-	var scene := runner.scene()
-	var hud := scene.get_node("HudLayer/Hud") as Hud
-
-	scene.call("select_variant", VARIANT_SUCCESS)
+	_enter_run_paused(scene)
 	scene.call("single_step")
 	scene.call("single_step")
 	assert_int(_simulation_of(scene).get_tick()).is_equal(2)
@@ -289,12 +281,10 @@ func test_restart_preserves_selected_variant() -> void:
 
 	var snapshot := _simulation_of(scene).get_state_snapshot()
 	assert_int(int(snapshot["tick"])).is_equal(0)
-	assert_int(int(snapshot["guard_view_range"])) \
-		.append_failure_message("restart zgubil parametry wybranego wariantu") \
-		.is_equal(4)
-	assert_str(String(scene.call("current_variant_name"))) \
-		.append_failure_message("restart przelaczyl wariant") \
-		.is_equal("SUKCES INTRUZA")
+	assert_vector((snapshot["guard_waypoints"] as Array)[2]) \
+		.append_failure_message("restart zgubil plan gracza") \
+		.is_equal(Vector2i(16, 10))
+	assert_int(int(scene.call("current_phase"))).is_equal(PHASE_RUN)
 	assert_bool(bool(scene.get("_running"))).is_false()
 
 
@@ -331,13 +321,13 @@ func test_playback_speed_defaults_to_normal_and_updates_runner() -> void:
 	assert_float(float(scene.call("playback_speed"))).is_equal_approx(0.5, 0.0001)
 
 
-## Dymny test: zmiana tempa nie rusza ticka, wariantu ani logu.
-func test_playback_speed_preserves_tick_variant_and_event_log() -> void:
+## Dymny test: zmiana tempa nie rusza ticka, fazy ani logu.
+func test_playback_speed_preserves_tick_phase_and_event_log() -> void:
 	var runner := scene_runner(MAIN_SCENE)
 	await runner.simulate_frames(1)
 	var scene := runner.scene()
 
-	scene.call("select_variant", VARIANT_SUCCESS)
+	_enter_run_paused(scene)
 	for i in range(8):
 		scene.call("single_step")
 
@@ -359,17 +349,17 @@ func test_playback_speed_preserves_tick_variant_and_event_log() -> void:
 	assert_str(after.get_canonical_log()) \
 		.append_failure_message("zmiana tempa wyczyscila event log") \
 		.is_equal(log_before)
-	assert_str(String(scene.call("current_variant_name"))) \
-		.append_failure_message("zmiana tempa przelaczyla wariant") \
-		.is_equal("SUKCES INTRUZA")
+	assert_int(int(scene.call("current_phase"))) \
+		.append_failure_message("zmiana tempa przelaczyla faze") \
+		.is_equal(PHASE_RUN)
 
 	# Pojedynczy krok nadal zwieksza tick dokladnie o 1, niezaleznie od tempa.
 	scene.call("single_step")
 	assert_int(_simulation_of(scene).get_tick()).is_equal(tick_before + 1)
 
 
-## Dymny test: restart i zmiana wariantu zachowują wybrane tempo.
-func test_restart_and_variant_selection_preserve_playback_speed() -> void:
+## Dymny test: restart i przejścia PLAN ↔ RUN zachowują wybrane tempo.
+func test_restart_and_phase_changes_preserve_playback_speed() -> void:
 	var runner := scene_runner(MAIN_SCENE)
 	await runner.simulate_frames(1)
 	var scene := runner.scene()
@@ -378,19 +368,22 @@ func test_restart_and_variant_selection_preserve_playback_speed() -> void:
 
 	scene.call("set_playback_speed", 0.5)
 
+	_enter_run_paused(scene)
 	hud.restart_requested.emit()
 	assert_float(float(scene.call("playback_speed"))) \
 		.append_failure_message("restart zgubil wybrane tempo") \
 		.is_equal_approx(0.5, 0.0001)
 	assert_float(timer.wait_time).is_equal_approx(0.2, 0.0001)
 
-	scene.call("select_variant", VARIANT_TICK_LIMIT)
+	scene.call("return_to_plan")
 	assert_float(float(scene.call("playback_speed"))) \
-		.append_failure_message("zmiana wariantu zgubila wybrane tempo") \
+		.append_failure_message("powrot do planu zgubil wybrane tempo") \
 		.is_equal_approx(0.5, 0.0001)
+
+	scene.call("start_run")
+	assert_float(float(scene.call("playback_speed"))).is_equal_approx(0.5, 0.0001)
 	assert_float(timer.wait_time).is_equal_approx(0.2, 0.0001)
 	assert_int(_simulation_of(scene).get_tick()).is_equal(0)
-	assert_bool(bool(scene.get("_running"))).is_false()
 
 
 ## Dymny test: wyróżniane są wyłącznie ticki, w których zapadła decyzja
@@ -400,19 +393,23 @@ func test_only_decision_ticks_are_highlighted() -> void:
 	await runner.simulate_frames(1)
 	var scene := runner.scene()
 
-	# Tick 35 to zwykle minięcie waypointu.
-	for i in range(35):
+	# W fazie planowania nie ma czego wyrozniac.
+	assert_array(scene.call("notable_events")).is_empty()
+	assert_array(scene.call("highlight_cells")).is_empty()
+
+	_enter_run_paused(scene)
+	# Tick 31 to zwykle minięcie waypointu.
+	for i in range(PUZZLE_SUSPICION_TICK - 1):
 		scene.call("single_step")
-	assert_int(_simulation_of(scene).get_tick()).is_equal(35)
+	assert_int(_simulation_of(scene).get_tick()).is_equal(PUZZLE_SUSPICION_TICK - 1)
 	assert_array(scene.call("notable_events")) \
 		.append_failure_message("rutynowy waypoint nie powinien byc wyrozniony") \
 		.is_empty()
 	assert_array(scene.call("highlight_cells")).is_empty()
 
-	# Tick 37 to przejscie straznika w SUSPICION.
+	# Tick 32 to przejscie straznika w SUSPICION.
 	scene.call("single_step")
-	scene.call("single_step")
-	assert_int(_simulation_of(scene).get_tick()).is_equal(37)
+	assert_int(_simulation_of(scene).get_tick()).is_equal(PUZZLE_SUSPICION_TICK)
 
 	var notable: Array = scene.call("notable_events")
 	assert_int(notable.size()) \
@@ -429,6 +426,7 @@ func test_timeline_marks_decision_ticks_and_terminal_tick() -> void:
 	var runner := scene_runner(MAIN_SCENE)
 	await runner.simulate_frames(1)
 	var scene := runner.scene()
+	_enter_run_paused(scene)
 
 	assert_array(scene.call("timeline_event_ticks")).is_empty()
 	assert_int(int(scene.call("terminal_tick"))) \
@@ -440,9 +438,9 @@ func test_timeline_marks_decision_ticks_and_terminal_tick() -> void:
 
 	assert_bool(_simulation_of(scene).is_finished()).is_true()
 	assert_array(scene.call("timeline_event_ticks")) \
-		.append_failure_message("os czasu powinna znaczyc ticki 37 i 38, bez waypointow") \
-		.is_equal([37, 38])
-	assert_int(int(scene.call("terminal_tick"))).is_equal(38)
+		.append_failure_message("os czasu powinna znaczyc ticki decyzji, bez waypointow") \
+		.is_equal(PUZZLE_DECISION_TICKS)
+	assert_int(int(scene.call("terminal_tick"))).is_equal(PUZZLE_TERMINAL_TICK)
 
 
 ## Dymny test: cofanie działa dzięki determinizmowi rdzenia — odtworzenie
@@ -451,15 +449,16 @@ func test_step_back_replays_run_deterministically() -> void:
 	var runner := scene_runner(MAIN_SCENE)
 	await runner.simulate_frames(1)
 	var scene := runner.scene()
+	_enter_run_paused(scene)
 
 	for i in range(60):
 		scene.call("single_step")
 	var terminal_log := _simulation_of(scene).get_canonical_log()
-	assert_int(_simulation_of(scene).get_tick()).is_equal(38)
+	assert_int(_simulation_of(scene).get_tick()).is_equal(PUZZLE_TERMINAL_TICK)
 
 	# Cofniecie odblokowuje dalsza gre: stan przestaje byc terminalny.
 	scene.call("step_back")
-	assert_int(_simulation_of(scene).get_tick()).is_equal(37)
+	assert_int(_simulation_of(scene).get_tick()).is_equal(PUZZLE_TERMINAL_TICK - 1)
 	assert_bool(_simulation_of(scene).is_finished()) \
 		.append_failure_message("po cofnieciu przebieg nie powinien byc zakonczony") \
 		.is_false()
@@ -495,6 +494,7 @@ func test_timeline_click_seeks_to_tick() -> void:
 	var scene := runner.scene()
 	var timeline := scene.get_node("Timeline") as TimelineView
 	var origin: Vector2 = timeline.global_position
+	_enter_run_paused(scene)
 
 	assert_int(timeline.horizon()).is_equal(40)
 	assert_int(timeline.tick_at_global_point(origin + Vector2(0.0, 13.0))).is_equal(0)
@@ -529,25 +529,113 @@ func test_timeline_click_seeks_to_tick() -> void:
 
 
 ## Dymny test: Home wraca na początek, End dociąga do wyniku terminalnego.
+## W fazie planowania przewijanie nie ma czego przewijać.
 func test_seek_to_end_reaches_terminal_outcome() -> void:
 	var runner := scene_runner(MAIN_SCENE)
 	await runner.simulate_frames(1)
 	var scene := runner.scene()
 
 	scene.call("seek_to_end")
+	assert_int(int(scene.call("current_phase"))).is_equal(PHASE_PLAN)
+	assert_object(_simulation_of(scene)).is_null()
+
+	_enter_run_paused(scene)
+	scene.call("seek_to_end")
 	assert_bool(_simulation_of(scene).is_finished()).is_true()
-	assert_int(_simulation_of(scene).get_tick()).is_equal(38)
+	assert_int(_simulation_of(scene).get_tick()).is_equal(PUZZLE_TERMINAL_TICK)
+	assert_str(_simulation_of(scene).get_outcome()) \
+		.is_equal(SimulationState.OUTCOME_INTRUDER_SUCCESS)
 
 	scene.call("seek_to_tick", 0)
 	assert_int(_simulation_of(scene).get_tick()).is_equal(0)
 	assert_bool(_simulation_of(scene).is_finished()).is_false()
 
-	# Wariant limitu konczy sie na swoim limicie, nie na 400.
-	scene.call("select_variant", VARIANT_TICK_LIMIT)
-	scene.call("seek_to_end")
-	assert_int(_simulation_of(scene).get_tick()).is_equal(20)
-	assert_str(_simulation_of(scene).get_outcome()) \
-		.is_equal(SimulationState.OUTCOME_TICK_LIMIT)
+
+## Klawisze faz: Spacja uruchamia noc, P wraca do planu, R w planie przywraca
+## plan domyślny, a w nocy restartuje ją na tym samym planie.
+func test_phase_keys_switch_between_plan_and_run() -> void:
+	var runner := scene_runner(MAIN_SCENE)
+	await runner.simulate_frames(1)
+	var scene := runner.scene()
+	var editor := scene.get_node("PlanEditor") as PlanEditor
+
+	assert_bool(editor.begin_drag(Vector2i(16, 8))).is_true()
+	editor.drag_to(Vector2i(16, 10))
+	editor.end_drag()
+
+	_press_key(scene, KEY_SPACE)
+	assert_int(int(scene.call("current_phase"))).is_equal(PHASE_RUN)
+	assert_bool(bool(scene.get("_running"))).is_true()
+
+	# W nocy Spacja to pauza, a R restartuje noc na tym samym planie.
+	_press_key(scene, KEY_SPACE)
+	assert_bool(bool(scene.get("_running"))).is_false()
+	scene.call("single_step")
+	_press_key(scene, KEY_R)
+	assert_int(_simulation_of(scene).get_tick()).is_equal(0)
+	assert_vector((editor.draft().guard_waypoints)[2]).is_equal(Vector2i(16, 10))
+
+	_press_key(scene, KEY_P)
+	assert_int(int(scene.call("current_phase"))).is_equal(PHASE_PLAN)
+	assert_bool(bool(scene.get("_running"))).is_false()
+
+	# R w planie: plan domyslny zagadki.
+	_press_key(scene, KEY_R)
+	assert_array(editor.draft().guard_waypoints) \
+		.is_equal(ScenarioL0.create_puzzle().guard_waypoints)
+
+
+## Mysz w fazie planowania: naciśnięcie na waypoincie, ruch, puszczenie.
+## Koordynator zamienia piksele na komórki; edytor dostaje wyłącznie komórki.
+func test_mouse_drag_on_board_moves_waypoint() -> void:
+	var runner := scene_runner(MAIN_SCENE)
+	await runner.simulate_frames(1)
+	var scene := runner.scene()
+	var editor := scene.get_node("PlanEditor") as PlanEditor
+	var board_origin := (scene.get_node("LevelL0") as Node2D).global_position
+	var half_cell := Vector2.ONE * float(LevelView.CELL_SIZE) * 0.5
+
+	var press := InputEventMouseButton.new()
+	press.button_index = MOUSE_BUTTON_LEFT
+	press.pressed = true
+	press.global_position = board_origin + Vector2(Vector2i(16, 8) * LevelView.CELL_SIZE) + half_cell
+	scene.call("_unhandled_input", press)
+	assert_bool(editor.is_dragging()).is_true()
+
+	var motion := InputEventMouseMotion.new()
+	motion.global_position = board_origin + Vector2(Vector2i(16, 11) * LevelView.CELL_SIZE) + half_cell
+	scene.call("_unhandled_input", motion)
+
+	var release := InputEventMouseButton.new()
+	release.button_index = MOUSE_BUTTON_LEFT
+	release.pressed = false
+	release.global_position = motion.global_position
+	scene.call("_unhandled_input", release)
+
+	assert_bool(editor.is_dragging()).is_false()
+	assert_vector(editor.draft().guard_waypoints[2]).is_equal(Vector2i(16, 11))
+	var preview: Dictionary = scene.call("plan_preview_snapshot")
+	assert_vector((preview["guard_waypoints"] as Array)[2]) \
+		.append_failure_message("podglad planu nie pokazuje przesunietego waypointu") \
+		.is_equal(Vector2i(16, 11))
+
+
+## Pełnoekranowy korzeń HUD nie może łapać myszy, a przyciski nie mogą
+## przechwytywać Spacji fokusem — inaczej gry nie da się obsłużyć myszą i Spacją.
+func test_hud_does_not_steal_mouse_or_space() -> void:
+	var runner := scene_runner(MAIN_SCENE)
+	await runner.simulate_frames(1)
+	var scene := runner.scene()
+	var hud := scene.get_node("HudLayer/Hud") as Control
+
+	assert_int(hud.mouse_filter) \
+		.append_failure_message("korzen HUD przechwytuje mysz nad plansza") \
+		.is_equal(Control.MOUSE_FILTER_IGNORE)
+	for child in hud.get_children():
+		if child is Button:
+			assert_int((child as Button).focus_mode) \
+				.append_failure_message("przycisk %s moze przejac Spacje fokusem" % child.name) \
+				.is_equal(Control.FOCUS_NONE)
 
 
 ## Układ HUD musi mieścić się w viewporcie i nie może się nakładać.
@@ -555,14 +643,29 @@ func test_seek_to_end_reaches_terminal_outcome() -> void:
 ## To jedyny test, który łapie wady widoczne wyłącznie na ekranie. Etykiety
 ## rozpychają się ponad zdefiniowane offsety, gdy tekst jest szerszy albo wyższy
 ## niż przewidziano, więc sam .tscn niczego nie gwarantuje. Stan po `seek_to_end`
-## jest najgorszym przypadkiem: najdłuższe teksty statusu i pełny panel zdarzeń.
+## jest najgorszym przypadkiem nocy: najdłuższy komunikat końcowy i pełny panel
+## zdarzeń. W planowaniu najgorszy jest widoczny komunikat odrzuconej edycji.
 func test_hud_layout_fits_viewport_without_overlaps() -> void:
 	var runner := scene_runner(MAIN_SCENE)
 	await runner.simulate_frames(1)
 	var scene := runner.scene()
+	var editor := scene.get_node("PlanEditor") as PlanEditor
+
+	# Plan: odrzucone upuszczenie kamery na trase intruza.
+	assert_bool(editor.begin_drag(Vector2i(3, 3))).is_true()
+	editor.drag_to(Vector2i(1, 15))
+	assert_bool(editor.end_drag()).is_false()
+	assert_str(String(scene.call("plan_message"))).is_not_empty()
+	await runner.simulate_frames(1)
+	_assert_hud_layout(scene, "PLAN")
+
+	_enter_run_paused(scene)
 	scene.call("seek_to_end")
 	await runner.simulate_frames(1)
+	_assert_hud_layout(scene, "NOC")
 
+
+func _assert_hud_layout(scene: Node, phase_label: String) -> void:
 	var viewport := Rect2(Vector2.ZERO, Vector2(VIEWPORT_WIDTH, VIEWPORT_HEIGHT))
 	var hud := scene.get_node("HudLayer/Hud") as Control
 
@@ -580,14 +683,15 @@ func test_hud_layout_fits_viewport_without_overlaps() -> void:
 
 	for i in rects.size():
 		assert_bool(viewport.encloses(rects[i])) \
-			.append_failure_message("%s wychodzi poza viewport: %s" % [names[i], str(rects[i])]) \
+			.append_failure_message("%s: %s wychodzi poza viewport: %s" % [
+				phase_label, names[i], str(rects[i])]) \
 			.is_true()
 
 	for i in rects.size():
 		for j in range(i + 1, rects.size()):
 			assert_bool(rects[i].intersects(rects[j])) \
-				.append_failure_message("%s naklada sie na %s: %s x %s" % [
-					names[i], names[j], str(rects[i]), str(rects[j])]) \
+				.append_failure_message("%s: %s naklada sie na %s: %s x %s" % [
+					phase_label, names[i], names[j], str(rects[i]), str(rects[j])]) \
 				.is_false()
 
 
@@ -624,6 +728,10 @@ func test_board_and_timeline_do_not_collide() -> void:
 		.append_failure_message("os czasu wjezdza w slupek HUD") \
 		.is_false()
 
+	# Edytor planu lezy dokladnie na planszy — komorka to ten sam piksel.
+	assert_vector((scene.get_node("PlanEditor") as Node2D).position) \
+		.is_equal((scene.get_node("LevelL0") as Node2D).position)
+
 
 ## Panele wyrównują kolumny spacjami, więc czcionka musi mieć stałą szerokość.
 func test_hud_panels_use_fixed_width_font() -> void:
@@ -647,11 +755,16 @@ func test_hud_panels_use_fixed_width_font() -> void:
 
 
 ## Warstwa prezentacji nie może zawierać fizyki: żadnych ciał, obszarów,
-## kształtów kolizji, raycastów ani agentów nawigacji.
+## kształtów kolizji, raycastów ani agentów nawigacji. Dotyczy to także
+## edytora planu — trafienie w komórkę to arytmetyka, nie kolizja.
 func test_presentation_contains_no_physics_nodes() -> void:
 	var runner := scene_runner(MAIN_SCENE)
 	await runner.simulate_frames(1)
 	var scene := runner.scene()
+
+	assert_object(scene.get_node_or_null("PlanEditor")) \
+		.append_failure_message("edytor planu powinien byc czescia sprawdzanej sceny") \
+		.is_not_null()
 
 	var forbidden := [
 		"Area2D", "CollisionShape2D", "CollisionPolygon2D", "RayCast2D", "ShapeCast2D",
@@ -675,6 +788,7 @@ func test_view_cannot_mutate_core_state() -> void:
 	var runner := scene_runner(MAIN_SCENE)
 	await runner.simulate_frames(1)
 	var scene := runner.scene()
+	_enter_run_paused(scene)
 	var simulation := _simulation_of(scene)
 	var level_view := scene.get_node("LevelL0") as LevelView
 
@@ -684,6 +798,6 @@ func test_view_cannot_mutate_core_state() -> void:
 	level_view.render(snapshot)
 
 	var fresh := simulation.get_state_snapshot()
-	assert_vector(fresh["guard_position"]).is_equal(Vector2i(10, 4))
+	assert_vector(fresh["guard_position"]).is_equal(ScenarioL0.create_puzzle().guard_start)
 	assert_str(String(fresh["guard_state"])).is_equal(GuardFsm.STATE_PATROL)
 	assert_int(simulation.get_tick()).is_equal(0)

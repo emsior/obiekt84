@@ -219,3 +219,30 @@ Praktyczna konsekwencja dla przyszłych zmian: **każde wprowadzenie stanu, któ
 **Uzasadnienie:** `SystemFont` działał tylko na desktopie z zainstalowaną czcionką monospace. W eksporcie Web (GitHub Pages) i w kontenerze CI Godot cofał się do czcionki proporcjonalnej. Skutki: 6 testów układu HUD czerwonych wyłącznie w CI, nachodzące na siebie wiersze legendy i logu w przeglądarce oraz puste kwadraty zamiast znaczników `●`, `○`, `►`. Domyślna czcionka Godota nie ma tych znaków, a w przeglądarce nie ma systemowego fallbacku. Obie czcionki DejaVu je mają.
 
 **Konsekwencje:** wygląd jest identyczny na Windows, w CI i w przeglądarce. Build Web rośnie o ok. 1,1 MB (przy 39 MB wasm). Krok instalujący fontconfig w CI został usunięty, bo testy nie zależą już od systemu.
+
+---
+
+## 2026-09-24 — Interaktywna faza planowania (L1-A)
+
+**Decyzja:** zdejmujemy decyzję z 2026-09-21 „Brak interaktywnego edytora planowania w tej iteracji”. Gra ma dwie fazy: **PLAN** — gracz przeciąga cztery waypointy patrolu i kamerę, klik w kamerę obraca ją o 90° zgodnie z ruchem wskazówek zegara — oraz **RUN** — deterministyczny przebieg nocy z tym planem. Z wyniku terminalnego i w każdej chwili RUN gracz wraca do PLAN z zachowanym planem.
+
+Zasady granicy:
+
+- Edytor (`scripts/presentation/plan_editor.gd`) edytuje **wyłącznie roboczą kopię `ScenarioL0` (draft)**, która żyje w warstwie prezentacji. Draft to dane wejściowe, nie stan domenowy — `SimulationState` nadal jest jedynym źródłem prawdy przebiegu.
+- Rdzeń dostaje draft wyłącznie przez `initialize(draft.duplicate_data())`. Nie wie o UI, nie ma API edycji i nie zna pojęcia fazy.
+- Prezentacja **nigdy nie pisze do stanu `Simulation`**. Podgląd w fazie PLAN to osobna, nigdy nie krokowana instancja `Simulation` zainicjalizowana draftem — widok czyta z niej snapshot, tak samo jak w RUN.
+- Każda zmiana draftu jest walidowana przez `ScenarioL0.validate()` na kopii. Odrzucona zmiana nie dotyka draftu, a gracz widzi pierwszy komunikat walidacji. Po każdej zmianie `guard_start = guard_waypoints[0]`.
+
+Zmiany w rdzeniu, wyłącznie addytywne:
+
+- `ScenarioL0.create_puzzle()` — dane zagadki. Te same wymiary, trasa intruza, kamera i zasięgi co `create()`; inny jest tylko patrol: `(10,4) (16,4) (16,8) (10,8)`. Dolny bok jest za wysoko — strażnik dostrzega intruza w 32 ticku, gubi go w 33, wraca do patrolu, a intruz kończy trasę w 40 (`INTRUDER_SUCCESS`). Przegrana wynika z ustawienia patrolu, nie z osłabienia strażnika (`guard_view_range` pozostaje 6). **`create()` zostało bez zmian**, więc trzy istniejące golden fixture'y są nietknięte.
+- `validate()` zyskał dwie reguły: `guard_start` musi być równy `guard_waypoints[0]` (inaczej edytor mógłby rozjechać start i patrol) oraz kamera nie może stać na komórce trasy intruza ani na waypoincie.
+
+**Uzasadnienie:** L0 udowodnił, że pętla symulacji jest deterministyczna i czytelna. Bez możliwości zmiany planu build jest odtwarzaczem incydentu, a nie grą — test komercyjno-projektowy wymaga, żeby gracz mógł przegrać, poprawić plan i wygrać. Edytor zmienia tylko dane wejściowe, więc wszystkie gwarancje determinizmu, golden logi i przewijanie pozostają w mocy bez zmian w regułach.
+
+**Konsekwencje:**
+
+- Trzy warianty incydentu (wykrycie, sukces, limit ticków) znikają z UI razem z klawiszami `1`/`2`/`3`. Żyją dalej wyłącznie w testach golden log. Zastępuje to decyzję z 2026-09-21 „Warianty incydentu jako dane wejściowe w warstwie prezentacji”.
+- Dwa nowe, świadomie dodane fixture'y: `tests/fixtures/l0_puzzle_default_golden_log.txt` (plan domyślny → `INTRUDER_SUCCESS`, tick 40) i `tests/fixtures/l0_puzzle_solution_golden_log.txt` (jawnie zapisany plan referencyjny: patrol zagadki + kamera `(17,9)` skierowana w dół → `INTRUDER_DETECTED` przez kamerę, tick 36). Drugi jest pierwszym golden logiem dla powodu `camera_detection`. Oba wygenerował prawdziwy silnik i oba zgadzają się z niezależną repliką reguł policzoną przed implementacją.
+- Poza zakresem pozostają: ściany, LOS, pathfinding, zmienna liczba waypointów, edycja trasy intruza i zasięgów, limit czasu na planowanie, strefy behawioralne i zapis planu.
+- Dwie poprawki sceny, bez których edytora nie da się obsłużyć myszą: korzeń HUD ma `mouse_filter = IGNORE` (pełnoekranowy `Control` zjadał kliknięcia przed `_unhandled_input`), a przyciski HUD mają `focus_mode = NONE` (po kliknięciu przycisku Spacja trafiała do przycisku z fokusem zamiast do koordynatora).

@@ -4,6 +4,7 @@
 [ext_resource type="PackedScene" path="res://scenes/level_l0.tscn" id="2_level"]
 [ext_resource type="Script" uid="uid://c3ossni2vs6gx" path="res://scripts/ui/hud.gd" id="3_hud"]
 [ext_resource type="Script" uid="uid://78ybq8u2a07s" path="res://scripts/presentation/timeline_view.gd" id="4_timeline"]
+[ext_resource type="Script" path="res://scripts/presentation/plan_editor.gd" id="5_plan_editor"]
 
 [node name="Main" type="Node2D" unique_id=930997715]
 script = ExtResource("1_runner")
@@ -16,12 +17,20 @@ color = Color(0.05, 0.06, 0.08, 1)
 [node name="LevelL0" parent="." unique_id=187939788 instance=ExtResource("2_level")]
 position = Vector2(32, 48)
 
+[node name="PlanEditor" type="Node2D" parent="."]
+position = Vector2(32, 48)
+script = ExtResource("5_plan_editor")
+
 [node name="Timeline" type="Node2D" parent="." unique_id=1036542248]
 position = Vector2(32, 640)
 script = ExtResource("4_timeline")
 
 [node name="StepTimer" type="Timer" parent="." unique_id=1257730544]
 wait_time = 0.1
+
+[node name="MessageTimer" type="Timer" parent="."]
+wait_time = 2.0
+one_shot = true
 
 [node name="HudLayer" type="CanvasLayer" parent="." unique_id=1766523953]
 
@@ -47,29 +56,29 @@ offset_top = 50.0
 offset_right = 1260.0
 offset_bottom = 74.0
 
-[node name="DetectionButton" type="Button" parent="HudLayer/Hud" unique_id=1017999858]
+[node name="RunButton" type="Button" parent="HudLayer/Hud"]
 layout_mode = 0
 offset_left = 620.0
 offset_top = 80.0
-offset_right = 800.0
+offset_right = 850.0
 offset_bottom = 112.0
-text = "Wykrycie [1]"
+text = "Uruchom noc [Spacja]"
 
-[node name="SuccessButton" type="Button" parent="HudLayer/Hud" unique_id=1197454618]
+[node name="PlanButton" type="Button" parent="HudLayer/Hud"]
 layout_mode = 0
-offset_left = 810.0
+offset_left = 858.0
 offset_top = 80.0
-offset_right = 990.0
+offset_right = 1052.0
 offset_bottom = 112.0
-text = "Sukces [2]"
+text = "Wróć do planu [P]"
 
-[node name="TickLimitButton" type="Button" parent="HudLayer/Hud" unique_id=1663004722]
+[node name="DefaultPlanButton" type="Button" parent="HudLayer/Hud"]
 layout_mode = 0
-offset_left = 1000.0
+offset_left = 1060.0
 offset_top = 80.0
-offset_right = 1200.0
+offset_right = 1260.0
 offset_bottom = 112.0
-text = "Limit ticków [3]"
+text = "Plan domyślny [R]"
 
 [node name="StartButton" type="Button" parent="HudLayer/Hud" unique_id=816287224]
 layout_mode = 0

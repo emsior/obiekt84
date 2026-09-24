@@ -52,3 +52,15 @@ Ocenę „czy interfejs nie przytłacza" wystawił właściciel projektu po otwa
 **Poprawki czytelności wynikłe z obejrzenia**, nie ze zgadywania: przywrócona hierarchia nagłówka nad podtytułem, znaczniki osi czasu na pełną wysokość, ciemny pierścień odcinający aktorów od tła (strażnik w stanie `ALARM` znikał we własnym czerwonym stożku), turkusowy stożek kamery zamiast niebieskiego (zlewał się z trasą intruza).
 
 **Co pozostaje poza L0:** ściany i pola zablokowane nie istnieją w danych scenariusza, interaktywny edytor planowania jest świadomie odłożony, a konfiguracja incydentu poza trzema wariantami nadal wymaga edycji kodu. To zakres L1, nie brak w L0.
+
+## L1-A — „PLAN → RUN” (2026-09-24)
+
+Cel: build przestaje być odtwarzaczem incydentu i staje się grą. W fazie PLAN gracz przeciąga cztery węzły patrolu i kamerę (klik obraca kamerę), w fazie RUN ogląda deterministyczną noc, a po wyniku wraca do planu z zachowanym planem. Decyzja i granica rdzeń/prezentacja: [DECISIONS.md](DECISIONS.md), wpis z 2026-09-24. Trzy warianty L0 zniknęły z UI — żyją wyłącznie w testach golden log.
+
+### Kryteria
+
+- [x] **Domyślny plan przegrywa.** `ScenarioL0.create_puzzle()` → `INTRUDER_SUCCESS` w 40 ticku. Strażnik dostrzega intruza w 32, gubi w 33 i wraca do patrolu. Testy: `test_l0_golden_log.gd::test_puzzle_default_ends_with_intruder_success` + golden `l0_puzzle_default_golden_log.txt`; determinizm: `test_simulation.gd::test_fifty_independent_puzzle_runs_are_identical`.
+- [x] **Rozwiązanie referencyjne wygrywa.** Ten sam patrol, kamera przeniesiona na `(17,9)` i skierowana w dół → `INTRUDER_DETECTED` przez kamerę w 36 ticku. Testy: `test_puzzle_solution_ends_with_camera_detection` + golden `l0_puzzle_solution_golden_log.txt`, a przez sam edytor, od przegranej do wygranej: `test_plan_editor.gd::test_player_can_turn_loss_into_win_through_editor`.
+- [ ] **Powrót do planu < 20 s.** Technicznie to jeden klawisz (`P`) albo jeden przycisk, bez przeładowania sceny. Kryterium z perspektywy gracza czeka na obejrzenie przez właściciela.
+- [x] **Plan przeżywa RUN.** Po powrocie z przerwanej i z zakończonej nocy draft jest identyczny, a edycja w trakcie nocy nie zmienia działającej `Simulation` ani danych jej restartu. Testy: `test_plan_editor.gd::test_plan_survives_run_and_return`, `test_editing_changes_draft_not_running_simulation`.
+- [ ] **Build Web na Pages gra się myszą bez klawiatury poza Spacją.** Pokryte strukturalnie: korzeń HUD nie łapie myszy, przyciski nie przejmują fokusu, każda akcja ma przycisk (`test_main_scene.gd::test_hud_does_not_steal_mouse_or_space`). Test w przeglądarce czeka na push i deploy na Pages.

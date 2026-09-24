@@ -5,10 +5,14 @@
 ## Zmiana reguł, która konsekwentnie zmieniłaby wszystkie 50 przebiegów tak samo,
 ## przeszłaby tamten test, a ten złapie ją natychmiast.
 ##
-## Pokryte są dwa zatwierdzone przebiegi:
-##   * wykrycie intruza  (INTRUDER_DETECTED) — domyślne dane ScenarioL0.create(),
-##   * sukces intruza    (INTRUDER_SUCCESS)  — te same dane z jednym świadomie
-##     zmienionym parametrem: mniejszy zasięg widzenia strażnika.
+## Pokryte są zatwierdzone przebiegi:
+##   * wykrycie intruza   (INTRUDER_DETECTED) — domyślne dane ScenarioL0.create(),
+##   * sukces intruza     (INTRUDER_SUCCESS)  — te same dane z jednym świadomie
+##     zmienionym parametrem: mniejszy zasięg widzenia strażnika,
+##   * limit ticków       (TICK_LIMIT)        — te same dane z krótszym max_ticks,
+##   * plan domyślny L1-A (INTRUDER_SUCCESS)  — ScenarioL0.create_puzzle(),
+##   * rozwiązanie L1-A   (INTRUDER_DETECTED) — dane zagadki z jawnie zapisanym
+##     planem gracza: cztery waypointy, pozycja i kierunek kamery.
 ##
 ## Czysty test rdzenia: zero node'ów, zero scen, zero Timerów, zero inputu,
 ## zero czasu rzeczywistego. Fixture'y są zatwierdzonymi artefaktami repozytorium
@@ -18,6 +22,8 @@ extends GdUnitTestSuite
 const GOLDEN_FIXTURE := "res://tests/fixtures/l0_incident_golden_log.txt"
 const SUCCESS_FIXTURE := "res://tests/fixtures/l0_success_golden_log.txt"
 const TICK_LIMIT_FIXTURE := "res://tests/fixtures/l0_tick_limit_golden_log.txt"
+const PUZZLE_DEFAULT_FIXTURE := "res://tests/fixtures/l0_puzzle_default_golden_log.txt"
+const PUZZLE_SOLUTION_FIXTURE := "res://tests/fixtures/l0_puzzle_solution_golden_log.txt"
 const SECTION_EVENT_LOG := "[EVENT_LOG]"
 const SECTION_FINAL_STATE := "[FINAL_STATE]"
 const HARD_TICK_LIMIT := 500
@@ -31,6 +37,23 @@ const SUCCESS_GUARD_VIEW_RANGE := 4
 ## Limit 20 wypada w trakcie trzeciego boku patrolu: log pokazuje trzy minięte
 ## waypointy, a wykrycie (tick 38) i sukces (tick 40) nie maja szans wystapic.
 const TICK_LIMIT_MAX_TICKS := 20
+
+## Referencyjny plan gracza dla zagadki L1-A, zapisany jawnie — nie wyliczany
+## i nie pobierany z create_puzzle(), żeby zmiana danych zagadki nie mogła po
+## cichu zmienić także rozwiązania. Patrol zostaje, kamera staje przy celu
+## intruza i patrzy w dół na ostatni odcinek jego trasy.
+const SOLUTION_WAYPOINTS: Array[Vector2i] = [
+	Vector2i(10, 4),
+	Vector2i(16, 4),
+	Vector2i(16, 8),
+	Vector2i(10, 8),
+]
+const SOLUTION_CAMERA_POSITION := Vector2i(17, 9)
+const SOLUTION_CAMERA_FACING := Vector2i(0, 1)
+
+## Ticki zakończenia zatwierdzonych przebiegów zagadki.
+const PUZZLE_DEFAULT_TERMINAL_TICK := 40
+const PUZZLE_SOLUTION_TERMINAL_TICK := 36
 
 
 # === wspolne helpery ==========================================================
@@ -62,6 +85,17 @@ func _create_success_scenario() -> ScenarioL0:
 func _create_tick_limit_scenario() -> ScenarioL0:
 	var scenario := ScenarioL0.create()
 	scenario.max_ticks = TICK_LIMIT_MAX_TICKS
+	return scenario
+
+
+## Plan gracza nałożony na świeże dane zagadki — dokładnie to, co edytor
+## przekazuje rdzeniowi: waypointy, start na pierwszym z nich, kamera.
+func _create_puzzle_solution_scenario() -> ScenarioL0:
+	var scenario := ScenarioL0.create_puzzle()
+	scenario.guard_waypoints = SOLUTION_WAYPOINTS.duplicate()
+	scenario.guard_start = SOLUTION_WAYPOINTS[0]
+	scenario.camera_position = SOLUTION_CAMERA_POSITION
+	scenario.camera_facing = SOLUTION_CAMERA_FACING
 	return scenario
 
 
@@ -464,6 +498,138 @@ func test_tick_limit_variant_does_not_mutate_default_or_success_scenarios() -> v
 	assert_str(_run_scenario_to_terminal(success_scenario).get_outcome()) \
 		.append_failure_message("wariant sukcesu przestal prowadzic do sukcesu intruza") \
 		.is_equal(SimulationState.OUTCOME_INTRUDER_SUCCESS)
+
+
+# === plan domyślny L1-A (INTRUDER_SUCCESS) ====================================
+
+## Plan, który gracz dostaje na start, musi przegrywać: intruz kończy trasę.
+func test_puzzle_default_ends_with_intruder_success() -> void:
+	var simulation := _run_scenario_to_terminal(ScenarioL0.create_puzzle())
+
+	assert_str(simulation.get_outcome()) \
+		.append_failure_message("plan domyslny zagadki nie przegrywa") \
+		.is_equal(SimulationState.OUTCOME_INTRUDER_SUCCESS)
+	assert_int(simulation.get_tick()).is_equal(PUZZLE_DEFAULT_TERMINAL_TICK)
+
+
+func test_puzzle_default_canonical_event_log_matches_golden_fixture() -> void:
+	var fixture := _load_fixture(PUZZLE_DEFAULT_FIXTURE)
+	var expected: PackedStringArray = fixture["events"]
+
+	var simulation := _run_scenario_to_terminal(ScenarioL0.create_puzzle())
+	var actual := _canonical_lines(simulation.get_canonical_log())
+
+	assert_str("\n".join(actual)) \
+		.append_failure_message(_describe_diff(
+			"event log (plan domyslny L1-A)", expected, actual, simulation.get_canonical_snapshot())) \
+		.is_equal("\n".join(expected))
+
+
+func test_puzzle_default_canonical_final_state_matches_golden_fixture() -> void:
+	var fixture := _load_fixture(PUZZLE_DEFAULT_FIXTURE)
+	var expected: PackedStringArray = fixture["state"]
+
+	var simulation := _run_scenario_to_terminal(ScenarioL0.create_puzzle())
+	var actual := _canonical_lines(simulation.get_canonical_snapshot())
+
+	assert_str("\n".join(actual)) \
+		.append_failure_message(_describe_diff(
+			"stan koncowy (plan domyslny L1-A)", expected, actual, simulation.get_canonical_snapshot())) \
+		.is_equal("\n".join(expected))
+
+
+func test_puzzle_default_golden_fixture_is_well_formed() -> void:
+	var fixture := _load_fixture(PUZZLE_DEFAULT_FIXTURE)
+	_assert_fixture_structure(fixture, PUZZLE_DEFAULT_FIXTURE)
+	_assert_single_trailing_newline(PUZZLE_DEFAULT_FIXTURE)
+
+	assert_array(Array(fixture["state"] as PackedStringArray)) \
+		.append_failure_message("fixture planu domyslnego nie deklaruje outcome=INTRUDER_SUCCESS") \
+		.contains(["outcome=%s" % SimulationState.OUTCOME_INTRUDER_SUCCESS])
+	assert_str("\n".join(fixture["events"] as PackedStringArray)) \
+		.append_failure_message("fixture planu domyslnego nie zawiera zdarzenia SUCCESS") \
+		.contains("|%s|%s|route_completed" % [ScenarioL0.INTRUDER_ID, IntruderScript.STATE_SUCCESS])
+
+
+# === rozwiązanie referencyjne L1-A (INTRUDER_DETECTED) ========================
+
+func test_puzzle_solution_is_valid_plan() -> void:
+	var scenario := _create_puzzle_solution_scenario()
+	assert_bool(scenario.is_valid()) \
+		.append_failure_message("plan referencyjny lamie walidacje: %s" % "; ".join(scenario.validate())) \
+		.is_true()
+
+
+## Istnieje plan, który wygrywa — i wygrywa normalną pracą silnika: kamera
+## wykrywa intruza na ostatnim odcinku trasy.
+func test_puzzle_solution_ends_with_camera_detection() -> void:
+	var simulation := _run_scenario_to_terminal(_create_puzzle_solution_scenario())
+
+	assert_str(simulation.get_outcome()) \
+		.append_failure_message("plan referencyjny nie wygrywa") \
+		.is_equal(SimulationState.OUTCOME_INTRUDER_DETECTED)
+	assert_int(simulation.get_tick()).is_equal(PUZZLE_SOLUTION_TERMINAL_TICK)
+	assert_str(simulation.get_canonical_log()) \
+		.append_failure_message("wykrycie nie nastapilo przez kamere") \
+		.contains("|%s|%s|%s" % [
+			ScenarioL0.INTRUDER_ID, IntruderScript.STATE_DETECTED, Simulation.REASON_CAMERA])
+
+
+func test_puzzle_solution_canonical_event_log_matches_golden_fixture() -> void:
+	var fixture := _load_fixture(PUZZLE_SOLUTION_FIXTURE)
+	var expected: PackedStringArray = fixture["events"]
+
+	var simulation := _run_scenario_to_terminal(_create_puzzle_solution_scenario())
+	var actual := _canonical_lines(simulation.get_canonical_log())
+
+	assert_str("\n".join(actual)) \
+		.append_failure_message(_describe_diff(
+			"event log (rozwiazanie L1-A)", expected, actual, simulation.get_canonical_snapshot())) \
+		.is_equal("\n".join(expected))
+
+
+func test_puzzle_solution_canonical_final_state_matches_golden_fixture() -> void:
+	var fixture := _load_fixture(PUZZLE_SOLUTION_FIXTURE)
+	var expected: PackedStringArray = fixture["state"]
+
+	var simulation := _run_scenario_to_terminal(_create_puzzle_solution_scenario())
+	var actual := _canonical_lines(simulation.get_canonical_snapshot())
+
+	assert_str("\n".join(actual)) \
+		.append_failure_message(_describe_diff(
+			"stan koncowy (rozwiazanie L1-A)", expected, actual, simulation.get_canonical_snapshot())) \
+		.is_equal("\n".join(expected))
+
+
+func test_puzzle_solution_golden_fixture_is_well_formed() -> void:
+	var fixture := _load_fixture(PUZZLE_SOLUTION_FIXTURE)
+	_assert_fixture_structure(fixture, PUZZLE_SOLUTION_FIXTURE)
+	_assert_single_trailing_newline(PUZZLE_SOLUTION_FIXTURE)
+
+	assert_array(Array(fixture["state"] as PackedStringArray)) \
+		.append_failure_message("fixture rozwiazania nie deklaruje outcome=INTRUDER_DETECTED") \
+		.contains(["outcome=%s" % SimulationState.OUTCOME_INTRUDER_DETECTED])
+	assert_str("\n".join(fixture["events"] as PackedStringArray)) \
+		.append_failure_message("fixture rozwiazania nie zawiera wykrycia przez kamere") \
+		.contains("|%s|%s|%s" % [
+			ScenarioL0.INTRUDER_ID, IntruderScript.STATE_DETECTED, Simulation.REASON_CAMERA])
+
+
+## Plan gracza nie może przeciekać do danych zagadki ani do create().
+func test_puzzle_solution_does_not_mutate_puzzle_or_default() -> void:
+	var solved := _run_scenario_to_terminal(_create_puzzle_solution_scenario())
+	assert_str(solved.get_outcome()).is_equal(SimulationState.OUTCOME_INTRUDER_DETECTED)
+
+	var puzzle := ScenarioL0.create_puzzle()
+	assert_vector(puzzle.camera_position) \
+		.append_failure_message("plan referencyjny zmutowal dane zagadki") \
+		.is_not_equal(SOLUTION_CAMERA_POSITION)
+	assert_str(_run_scenario_to_terminal(puzzle).get_outcome()) \
+		.append_failure_message("plan domyslny przestal przegrywac") \
+		.is_equal(SimulationState.OUTCOME_INTRUDER_SUCCESS)
+	assert_str(_run_to_terminal().get_outcome()) \
+		.append_failure_message("create() przestalo prowadzic do wykrycia intruza") \
+		.is_equal(SimulationState.OUTCOME_INTRUDER_DETECTED)
 
 
 # === ochrona eksportu =========================================================

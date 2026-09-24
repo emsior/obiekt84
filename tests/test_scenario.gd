@@ -10,11 +10,13 @@
 ## rzeczywistego.
 extends GdUnitTestSuite
 
-## Warianty, które warstwa prezentacji tworzy z domyślnego scenariusza.
-## Wartości powtórzone jawnie za `scripts/presentation/simulation_runner.gd` —
-## test rdzenia nie zależy od klasy prezentacji.
+## Warianty incydentu z golden logów (`tests/test_l0_golden_log.gd`). Od L1-A
+## żyją wyłącznie w testach — UI ich nie oferuje (`docs/DECISIONS.md`, 2026-09-24).
 const SUCCESS_GUARD_VIEW_RANGE := 4
 const TICK_LIMIT_MAX_TICKS := 20
+
+## Pola, którymi dane zagadki L1-A różnią się od `ScenarioL0.create()`.
+const PUZZLE_CHANGED_FIELDS: Array[String] = ["guard_start", "guard_waypoints"]
 
 
 func _problems_text(scenario: ScenarioL0) -> String:
@@ -37,8 +39,31 @@ func test_default_scenario_is_valid() -> void:
 		.is_true()
 
 
-## Oba warianty UI powstają przez zmianę jednej wartości domyślnego scenariusza.
-## Jeżeli któraś z tych zmian łamałaby walidację, wariant nie dałby się uruchomić.
+## Plan domyślny fazy planowania musi dać się uruchomić bez żadnej poprawki.
+func test_puzzle_scenario_is_valid() -> void:
+	var scenario := ScenarioL0.create_puzzle()
+	assert_bool(scenario.is_valid()) 		.append_failure_message("scenariusz zagadki ma problemy: %s" % _problems_text(scenario)) 		.is_true()
+	assert_vector(scenario.guard_start) 		.append_failure_message("straznik zagadki nie startuje na pierwszym waypoincie") 		.is_equal(scenario.guard_waypoints[0])
+
+
+## Zagadka różni się od `create()` wyłącznie patrolem: te same wymiary, trasa,
+## kamera i zasięgi. Przegrana ma wynikać z ustawienia patrolu, nie z osłabienia
+## strażnika ani z innych danych. Refleksja łapie też przyszłe pola.
+func test_puzzle_differs_from_default_only_in_patrol() -> void:
+	var puzzle := ScenarioL0.create_puzzle()
+	var default := ScenarioL0.create()
+
+	for name: String in _script_property_names(puzzle):
+		if PUZZLE_CHANGED_FIELDS.has(name):
+			continue
+		assert_bool(puzzle.get(name) == default.get(name)) 			.append_failure_message("zagadka zmienia pole '%s': %s zamiast %s" % [
+				name, str(puzzle.get(name)), str(default.get(name))]) 			.is_true()
+
+	assert_bool(puzzle.guard_waypoints == default.guard_waypoints) 		.append_failure_message("zagadka ma ten sam patrol co create() - nie byloby czego poprawiac") 		.is_false()
+
+
+## Warianty golden logów powstają przez zmianę jednej wartości domyślnego scenariusza.
+## Jeżeli któraś z tych zmian łamałaby walidację, wariantu nie dałoby się uruchomić.
 func test_ui_variants_are_valid() -> void:
 	var success := ScenarioL0.create()
 	success.guard_view_range = SUCCESS_GUARD_VIEW_RANGE
@@ -144,6 +169,43 @@ func test_non_positive_max_ticks_is_reported() -> void:
 	assert_str(_problems_text(scenario)).contains("max_ticks")
 
 
+## Edytor przesuwa waypointy — rozjechany start oznaczałby patrol inny niż
+## ten, który gracz widzi na planszy.
+func test_guard_start_different_from_first_waypoint_is_reported() -> void:
+	var scenario := ScenarioL0.create_puzzle()
+	scenario.guard_start = scenario.guard_waypoints[1]
+
+	assert_bool(scenario.is_valid()).is_false()
+	assert_str(_problems_text(scenario)) 		.append_failure_message("rozjazd startu i pierwszego waypointu nie zostal zgloszony") 		.contains("guard_start")
+
+
+## Pusta lista waypointów ma własny komunikat — reguła startu nie może się
+## na niej wywrócić ani dublować problemu.
+func test_guard_start_rule_skips_empty_waypoints() -> void:
+	var scenario := ScenarioL0.create()
+	scenario.guard_waypoints = [] as Array[Vector2i]
+
+	var problems := scenario.validate()
+	assert_int(problems.size()) 		.append_failure_message("pusta lista waypointow powinna dac jeden komunikat: %s" % _problems_text(scenario)) 		.is_equal(1)
+	assert_str(problems[0]).contains("guard_waypoints")
+
+
+func test_camera_on_intruder_route_is_reported() -> void:
+	var scenario := ScenarioL0.create_puzzle()
+	scenario.camera_position = scenario.intruder_route[5]
+
+	assert_bool(scenario.is_valid()).is_false()
+	assert_str(_problems_text(scenario)) 		.append_failure_message("kamera na trasie intruza nie zostala zgloszona") 		.contains("intruder_route[5]")
+
+
+func test_camera_on_waypoint_is_reported() -> void:
+	var scenario := ScenarioL0.create_puzzle()
+	scenario.camera_position = scenario.guard_waypoints[2]
+
+	assert_bool(scenario.is_valid()).is_false()
+	assert_str(_problems_text(scenario)) 		.append_failure_message("kamera na waypoincie nie zostala zgloszona") 		.contains("guard_waypoints[2]")
+
+
 ## Przy zerowej siatce walidacja kończy się na wymiarach — dalsze kontrole
 ## granic nie miałyby o co pytać.
 func test_degenerate_grid_is_reported() -> void:
@@ -173,7 +235,16 @@ func test_validation_reports_every_problem_at_once() -> void:
 ## między przebiegami. Test nie wykryje wyłącznie pola, którego wartość
 ## domyślna jest równa wartości ze scenariusza.
 func test_duplicate_data_copies_every_script_property() -> void:
-	var original := ScenarioL0.create()
+	_assert_copies_every_script_property(ScenarioL0.create())
+
+
+## Edytor planowania startuje od danych zagadki i kopiuje draft przy każdym
+## uruchomieniu nocy — kopia musi być kompletna także dla tej fabryki.
+func test_duplicate_data_copies_every_script_property_of_puzzle() -> void:
+	_assert_copies_every_script_property(ScenarioL0.create_puzzle())
+
+
+func _assert_copies_every_script_property(original: ScenarioL0) -> void:
 	var copy := original.duplicate_data()
 	var names := _script_property_names(original)
 

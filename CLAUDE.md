@@ -50,7 +50,7 @@ Priorytetem jest **działający i deterministyczny L0**, nie architektura pod pr
 ## Zakres
 
 - **Nie dodawać funkcji spoza aktualnego scope.** Poza zakresem pozostają: kampania, roguelite, metaprogresja, generowanie proceduralne, ekonomia, ekwipunek, zapis, limit czasu na planowanie, strefy behawioralne, elementy L2, pathfinding, AStar, NavMesh, dźwięk, animacje, shadery, multiplayer, event bus, ECS, service locator i DI container.
-- Interaktywny edytor planowania (ustawianie kamer i waypointów) **nie należy do tej iteracji**.
+- **L1-A ma interaktywny edytor planowania:** przeciąganie czterech waypointów patrolu (liczba stała) i kamery oraz obrót kamery. Edytor zmienia wyłącznie roboczą kopię `ScenarioL0` w prezentacji; rdzeń dostaje ją przez `initialize()` (`docs/DECISIONS.md`, 2026-09-24). Ściany, LOS, pathfinding, zmienna liczba waypointów, edycja trasy intruza i zasięgów oraz strefy behawioralne **nadal są poza zakresem**.
 
 ## Git
 

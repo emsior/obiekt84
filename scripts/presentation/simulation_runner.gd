@@ -1,36 +1,32 @@
-## Koordynator sceny L0: wybór wariantu incydentu, adapter czasu, obsługa
-## wejścia i odświeżanie widoku.
+## Koordynator sceny: fazy PLAN i RUN, adapter czasu, obsługa wejścia
+## i odświeżanie widoku.
+##
+## **PLAN** — gracz ustawia patrol i kamerę w edytorze (`PlanEditor`), który
+## trzyma roboczą kopię danych scenariusza (draft). Plansza pokazuje draft:
+## waypointy, kamerę, oba stożki w pozycji startowej i całą trasę intruza.
+## **RUN** — deterministyczna noc na kopii draftu. Z RUN w każdej chwili wracamy
+## do PLAN z tym samym draftem.
+##
+## Rdzeń dostaje draft wyłącznie przez `initialize()`. Prezentacja nigdy nie
+## pisze do stanu `Simulation` — decyzja: `docs/DECISIONS.md`, 2026-09-24.
 ##
 ## Timer jest wyłącznie tempem wizualnym — nie jest zegarem domenowym.
 ## Każdy timeout wywołuje najwyżej jeden jawny step(). Jitter Timera nie może
 ## zmienić wyniku logicznego, bo rdzeń nie widzi delty ani czasu rzeczywistego.
-##
-## Warianty incydentu to wyłącznie **różne dane wejściowe** tego samego silnika
-## L0 — nie zmieniają żadnej reguły gry. Każdy startuje od świeżych danych
-## `ScenarioL0.create()`; dwa z nich zmieniają dokładnie jedno pole.
-## Konfiguracja żyje tutaj, bo potrzebuje jej wyłącznie warstwa prezentacji.
 extends Node2D
 
-enum ScenarioVariant {
-	DETECTION,
-	SUCCESS,
-	TICK_LIMIT,
+enum Phase {
+	PLAN,
+	RUN,
 }
 
-## Zasięg widzenia strażnika w wariancie sukcesu. Przy tej wartości strażnik
-## dostrzega intruza na jeden tick, gubi cel, wraca do patrolu, a intruz kończy
-## trasę. Wynik powstaje normalną pracą silnika.
-const SUCCESS_GUARD_VIEW_RANGE := 4
-
-## Limit ticków w wariancie limitu. Wykrycie wypada w 38 ticku, więc przebieg
-## urywa się naturalnie, zanim którykolwiek aktor osiągnie stan terminalny.
-const TICK_LIMIT_MAX_TICKS := 20
-
-const VARIANT_NAMES := {
-	ScenarioVariant.DETECTION: "WYKRYCIE",
-	ScenarioVariant.SUCCESS: "SUKCES INTRUZA",
-	ScenarioVariant.TICK_LIMIT: "LIMIT TICKÓW",
+const PHASE_NAMES := {
+	Phase.PLAN: Hud.PHASE_PLAN,
+	Phase.RUN: Hud.PHASE_RUN,
 }
+
+## Jak długo HUD pokazuje komunikat odrzuconej edycji.
+const REJECT_MESSAGE_SECONDS := 2.0
 
 ## Tempo automatycznego przebiegu. To wyłącznie odstęp czasu między kolejnymi
 ## wywołaniami step() — zawartość ticka, ich kolejność, FOV, FSM, event log
@@ -44,12 +40,18 @@ const DEFAULT_SPEED_INDEX := 1
 const ROUTINE_EVENT := "WAYPOINT_REACHED"
 
 @onready var _level_view: LevelView = $LevelL0
+@onready var _plan_editor: PlanEditor = $PlanEditor
 @onready var _timeline: TimelineView = $Timeline
 @onready var _hud: Hud = $HudLayer/Hud
 @onready var _step_timer: Timer = $StepTimer
+@onready var _message_timer: Timer = $MessageTimer
 
+var _phase: Phase = Phase.PLAN
+## Dane bieżącej nocy: kopia draftu z chwili uruchomienia. Przewijanie i restart
+## odtwarzają noc z tych danych, więc edycja draftu nie może ich zmienić.
+var _run_scenario: ScenarioL0 = null
 var _simulation: Simulation = null
-var _variant: ScenarioVariant = ScenarioVariant.DETECTION
+var _plan_message := ""
 var _speed_index := DEFAULT_SPEED_INDEX
 var _running := false
 var _overlay_visible := true
@@ -61,43 +63,50 @@ func _ready() -> void:
 	_step_timer.timeout.connect(_on_step_timeout)
 	_apply_speed()
 
+	_message_timer.one_shot = true
+	_message_timer.wait_time = REJECT_MESSAGE_SECONDS
+	_message_timer.timeout.connect(_clear_plan_message)
+
 	_hud.start_requested.connect(_on_start_requested)
 	_hud.pause_toggle_requested.connect(_on_pause_toggle_requested)
 	_hud.restart_requested.connect(_on_restart_requested)
-	_hud.variant_requested.connect(select_variant)
 	_hud.speed_requested.connect(select_speed_index)
 	_hud.step_back_requested.connect(step_back)
 	_hud.step_forward_requested.connect(single_step)
+	_hud.run_requested.connect(start_run)
+	_hud.plan_requested.connect(return_to_plan)
+	_hud.default_plan_requested.connect(reset_plan)
+
+	# Edytor leży dokładnie na planszy: komórka (x, y) to ten sam piksel.
+	_plan_editor.position = _level_view.position
+	_plan_editor.draft_changed.connect(_on_draft_changed)
+	_plan_editor.edit_rejected.connect(_on_edit_rejected)
 
 	_level_view.set_overlay_visible(_overlay_visible)
-	_rebuild_simulation()
+	_render()
 
 
-## Sterowanie klawiaturą. Wejście należy wyłącznie do warstwy prezentacji —
-## rdzeń nigdy go nie widzi.
+## Sterowanie klawiaturą i myszą. Wejście należy wyłącznie do warstwy
+## prezentacji — rdzeń nigdy go nie widzi.
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		_handle_mouse_button(event as InputEventMouseButton)
 		return
+	if event is InputEventMouseMotion:
+		_handle_mouse_motion(event as InputEventMouseMotion)
+		return
 	if not (event is InputEventKey) or not event.is_pressed() or event.is_echo():
 		return
 
-	var key_event := event as InputEventKey
-	match key_event.keycode:
-		KEY_1:
-			select_variant(ScenarioVariant.DETECTION)
-		KEY_2:
-			select_variant(ScenarioVariant.SUCCESS)
-		KEY_3:
-			select_variant(ScenarioVariant.TICK_LIMIT)
-		KEY_SPACE:
-			_on_pause_toggle_requested()
-		KEY_N, KEY_PERIOD:
-			single_step()
-		KEY_COMMA:
-			step_back()
-		KEY_R:
-			_on_restart_requested()
+	var keycode := (event as InputEventKey).keycode
+	var handled := _handle_plan_key(keycode) if _phase == Phase.PLAN else _handle_run_key(keycode)
+	if handled:
+		get_viewport().set_input_as_handled()
+
+
+## Klawisze wspólne dla obu faz: tempo, stożki, panel zdarzeń.
+func _handle_common_key(keycode: Key) -> bool:
+	match keycode:
 		KEY_F:
 			toggle_overlay()
 		KEY_L:
@@ -106,6 +115,34 @@ func _unhandled_input(event: InputEvent) -> void:
 			step_speed(-1)
 		KEY_BRACKETRIGHT:
 			step_speed(1)
+		_:
+			return false
+	return true
+
+
+func _handle_plan_key(keycode: Key) -> bool:
+	match keycode:
+		KEY_SPACE:
+			start_run()
+		KEY_R:
+			reset_plan()
+		_:
+			return _handle_common_key(keycode)
+	return true
+
+
+func _handle_run_key(keycode: Key) -> bool:
+	match keycode:
+		KEY_SPACE:
+			_on_pause_toggle_requested()
+		KEY_N, KEY_PERIOD:
+			single_step()
+		KEY_COMMA:
+			step_back()
+		KEY_R:
+			_on_restart_requested()
+		KEY_P:
+			return_to_plan()
 		KEY_HOME:
 			seek_to_tick(0)
 		KEY_END:
@@ -113,13 +150,28 @@ func _unhandled_input(event: InputEvent) -> void:
 		KEY_ESCAPE:
 			pause()
 		_:
-			return
-	get_viewport().set_input_as_handled()
+			return _handle_common_key(keycode)
+	return true
 
 
-## Kliknięcie w oś czasu przewija przebieg do wskazanego ticka.
+## PLAN: przeciąganie po planszy. RUN: kliknięcie w oś czasu przewija przebieg.
 func _handle_mouse_button(event: InputEventMouseButton) -> void:
-	if not event.pressed or event.button_index != MOUSE_BUTTON_LEFT:
+	if event.button_index != MOUSE_BUTTON_LEFT:
+		return
+	if _phase == Phase.PLAN:
+		var cell := _plan_editor.cell_at_global_point(event.global_position)
+		if event.pressed:
+			if not _plan_editor.begin_drag(cell):
+				return
+		elif _plan_editor.is_dragging():
+			_plan_editor.drag_to(cell)
+			_plan_editor.end_drag()
+		else:
+			return
+		get_viewport().set_input_as_handled()
+		return
+
+	if not event.pressed:
 		return
 	if not _timeline.contains_global_point(event.global_position):
 		return
@@ -127,10 +179,90 @@ func _handle_mouse_button(event: InputEventMouseButton) -> void:
 	get_viewport().set_input_as_handled()
 
 
+func _handle_mouse_motion(event: InputEventMouseMotion) -> void:
+	if _phase != Phase.PLAN or not _plan_editor.is_dragging():
+		return
+	_plan_editor.drag_to(_plan_editor.cell_at_global_point(event.global_position))
+	get_viewport().set_input_as_handled()
+
+
+# === fazy PLAN i RUN ==========================================================
+
+func current_phase() -> Phase:
+	return _phase
+
+
+func current_phase_name() -> String:
+	return String(PHASE_NAMES[_phase])
+
+
+## Uruchomienie nocy: kopia draftu trafia do świeżej `Simulation` przez
+## `initialize()` i przebieg od razu rusza — gracz nie musi niczego dociskać.
+func start_run() -> void:
+	if _phase == Phase.RUN:
+		return
+	_plan_editor.cancel_drag()
+	_clear_plan_message()
+	_run_scenario = _plan_editor.draft()
+	_phase = Phase.RUN
+	seek_to_tick(0)
+	_on_start_requested()
+
+
+## Powrót do planowania z tym samym draftem — z wyniku terminalnego albo
+## w trakcie nocy. Ostatnia symulacja jest porzucana, nie wznawiana.
+func return_to_plan() -> void:
+	if _phase == Phase.PLAN:
+		return
+	_stop()
+	_phase = Phase.PLAN
+	_render()
+
+
+## Klawisz R w fazie planowania: plan domyślny zagadki.
+func reset_plan() -> void:
+	if _phase != Phase.PLAN:
+		return
+	_plan_editor.reset_to_puzzle()
+
+
+func plan_message() -> String:
+	return _plan_message
+
+
+## Podgląd planu: osobna, nigdy nie krokowana `Simulation` zainicjalizowana
+## kopią draftu. Widok czyta z niej snapshot dokładnie tak samo jak w nocy,
+## więc plansza pokazuje to, co rdzeń naprawdę dostanie na starcie.
+func plan_preview_snapshot() -> Dictionary:
+	var preview := Simulation.new()
+	preview.initialize(_plan_editor.draft())
+	return preview.get_state_snapshot()
+
+
+## Zmiana draftu przerysowuje podgląd tylko w fazie planowania. Trwająca noc
+## pracuje na własnej kopii danych i nie może jej zobaczyć.
+func _on_draft_changed() -> void:
+	if _phase != Phase.PLAN:
+		return
+	_clear_plan_message()
+
+
+func _on_edit_rejected(message: String) -> void:
+	_plan_message = message
+	_message_timer.start()
+	_render()
+
+
+func _clear_plan_message() -> void:
+	_plan_message = ""
+	_message_timer.stop()
+	_render()
+
+
 # === tempo automatycznego przebiegu ===========================================
 
 ## Zmiana tempa o jeden stopień: -1 wolniej, +1 szybciej. Na krańcach zostaje
-## przy skrajnej wartości. Nie rusza ticka, logu, wariantu ani stanu auto-run.
+## przy skrajnej wartości. Nie rusza ticka, logu, planu ani stanu auto-run.
 func step_speed(direction: int) -> void:
 	select_speed_index(clampi(_speed_index + direction, 0, PLAYBACK_SPEEDS.size() - 1))
 
@@ -178,54 +310,22 @@ func _apply_speed() -> void:
 		_step_timer.start()
 
 
-# === warianty incydentu =======================================================
-
-## Wybór wariantu natychmiast restartuje przebieg na świeżych danych.
-## Poprzednia instancja Simulation jest porzucana, nie wznawiana.
-func select_variant(variant: ScenarioVariant) -> void:
-	_variant = variant
-	_rebuild_simulation()
-
-
-func current_variant() -> ScenarioVariant:
-	return _variant
-
-
-func current_variant_name() -> String:
-	return String(VARIANT_NAMES[_variant])
-
-
-## Świeże dane wejściowe dla aktualnego wariantu. Zawsze zaczynamy od
-## ScenarioL0.create(); warianty zmieniają najwyżej jedno pole.
-func _build_scenario() -> ScenarioL0:
-	var scenario := ScenarioL0.create()
-	match _variant:
-		ScenarioVariant.SUCCESS:
-			scenario.guard_view_range = SUCCESS_GUARD_VIEW_RANGE
-		ScenarioVariant.TICK_LIMIT:
-			scenario.max_ticks = TICK_LIMIT_MAX_TICKS
-		_:
-			pass
-	return scenario
-
-
-## Świeża symulacja na świeżych danych plus czysty stan prezentacji.
-func _rebuild_simulation() -> void:
-	seek_to_tick(0)
-
+# === przewijanie nocy =========================================================
 
 ## Przewinięcie przebiegu do wskazanego ticka.
 ##
 ## Działa **dzięki determinizmowi rdzenia**: nie ma cofania stanu ani historii
-## snapshotów — budujemy świeżą symulację na tych samych danych i wykonujemy
+## snapshotów — budujemy świeżą symulację na tych samych danych nocy i wykonujemy
 ## dokładnie [param target] kroków. Ten sam scenariusz zawsze daje ten sam
 ## przebieg, więc odtworzony tick jest identyczny z oryginalnym.
 ##
-## Przewijanie zatrzymuje automatyczny przebieg i zachowuje wariant oraz tempo.
+## Przewijanie zatrzymuje automatyczny przebieg i zachowuje plan oraz tempo.
 func seek_to_tick(target: int) -> void:
+	if _phase != Phase.RUN:
+		return
 	_stop()
 	_simulation = Simulation.new()
-	_simulation.initialize(_build_scenario())
+	_simulation.initialize(_run_scenario)
 	for i in range(maxi(0, target)):
 		if _simulation.is_finished():
 			break
@@ -236,11 +336,15 @@ func seek_to_tick(target: int) -> void:
 ## Przewinięcie do końca przebiegu. Pętla w [method seek_to_tick] i tak kończy
 ## się na stanie terminalnym, więc limit scenariusza jest tu tylko górną granicą.
 func seek_to_end() -> void:
+	if _phase != Phase.RUN:
+		return
 	seek_to_tick(int(_simulation.get_state_snapshot()["max_ticks"]))
 
 
 ## Cofnięcie o jeden tick. Na ticku 0 nie robi nic.
 func step_back() -> void:
+	if _phase != Phase.RUN:
+		return
 	var tick := _simulation.get_tick()
 	if tick <= 0:
 		return
@@ -259,6 +363,8 @@ func _on_step_timeout() -> void:
 ## Pojedynczy krok symulacji. Po stanie terminalnym jest bezpiecznym no-op —
 ## rdzeń i tak odrzuca dalsze step(), a tutaj dodatkowo zatrzymujemy odtwarzanie.
 func single_step() -> void:
+	if _phase != Phase.RUN:
+		return
 	if _simulation.is_finished():
 		_stop()
 		_render()
@@ -272,7 +378,7 @@ func single_step() -> void:
 
 
 func _on_start_requested() -> void:
-	if _simulation.is_finished() or _running:
+	if _phase != Phase.RUN or _simulation.is_finished() or _running:
 		return
 	_running = true
 	_step_timer.start()
@@ -280,7 +386,7 @@ func _on_start_requested() -> void:
 
 
 func _on_pause_toggle_requested() -> void:
-	if _simulation.is_finished():
+	if _phase != Phase.RUN or _simulation.is_finished():
 		return
 	if _running:
 		_stop()
@@ -298,9 +404,9 @@ func pause() -> void:
 	_render()
 
 
-## Restart odtwarza **aktualnie wybrany** wariant, nie wraca do domyślnego.
+## Restart nocy na tym samym planie: świeża symulacja, tick 0, pauza.
 func _on_restart_requested() -> void:
-	_rebuild_simulation()
+	seek_to_tick(0)
 
 
 func toggle_overlay() -> void:
@@ -324,8 +430,10 @@ func _stop() -> void:
 ## Zdarzenia z bieżącego ticka, które są warte uwagi testera.
 ## Wyliczane z danych, które i tak już mamy — rdzeń nic o tym nie wie.
 func notable_events() -> Array[Dictionary]:
-	var tick := _simulation.get_tick()
 	var notable: Array[Dictionary] = []
+	if _phase != Phase.RUN:
+		return notable
+	var tick := _simulation.get_tick()
 	for entry: Dictionary in _simulation.get_last_events(Hud.LOG_LINES):
 		if int(entry["tick"]) == tick and String(entry["event"]) != ROUTINE_EVENT:
 			notable.append(entry)
@@ -335,8 +443,10 @@ func notable_events() -> Array[Dictionary]:
 ## Komórki podmiotów, których dotyczą zdarzenia bieżącego ticka.
 ## Dzięki temu tester widzi na planszy dokładnie to, co czyta w logu.
 func highlight_cells() -> Array[Vector2i]:
-	var snapshot := _simulation.get_state_snapshot()
 	var cells: Array[Vector2i] = []
+	if _phase != Phase.RUN:
+		return cells
+	var snapshot := _simulation.get_state_snapshot()
 	for entry: Dictionary in notable_events():
 		var subject := String(entry["subject"])
 		var cell := Vector2i.ZERO
@@ -359,6 +469,8 @@ func highlight_cells() -> Array[Vector2i]:
 ## minięcie waypointu — materiał na znaczniki osi czasu.
 func timeline_event_ticks() -> Array[int]:
 	var ticks: Array[int] = []
+	if _phase != Phase.RUN:
+		return ticks
 	for entry: Dictionary in _simulation.get_event_log():
 		if String(entry["event"]) == ROUTINE_EVENT:
 			continue
@@ -368,28 +480,38 @@ func timeline_event_ticks() -> Array[int]:
 	return ticks
 
 
-## Tick zakończenia przebiegu albo -1, gdy incydent jeszcze trwa.
+## Tick zakończenia przebiegu albo -1, gdy noc jeszcze trwa albo trwa planowanie.
 func terminal_tick() -> int:
-	return _simulation.get_tick() if _simulation.is_finished() else -1
+	if _phase != Phase.RUN or not _simulation.is_finished():
+		return -1
+	return _simulation.get_tick()
 
 
-## Widok i HUD czytają wyłącznie snapshot oraz kopię logu.
+## Widok i HUD czytają wyłącznie snapshot oraz kopię logu. W fazie planowania
+## snapshot pochodzi z podglądu draftu, a log jest pusty.
 func _render() -> void:
-	var snapshot := _simulation.get_state_snapshot()
-	var notable := notable_events()
+	var planning := _phase == Phase.PLAN
+	var snapshot := plan_preview_snapshot() if planning else _simulation.get_state_snapshot()
+	var events: Array[Dictionary] = []
+	if not planning:
+		events = _simulation.get_last_events(Hud.LOG_LINES)
+
+	_plan_editor.visible = planning
+	# W planowaniu nie ma przebiegu do przewijania — oś czasu wraca w nocy.
+	_timeline.visible = not planning
 	_level_view.render(snapshot, highlight_cells())
 	_timeline.render(snapshot, timeline_event_ticks(), terminal_tick())
 	_hud.render(
 		snapshot,
-		_simulation.get_last_events(Hud.LOG_LINES),
+		events,
 		{
-			"notable_events": notable,
+			"phase": current_phase_name(),
+			"plan_message": _plan_message,
+			"notable_events": notable_events(),
 			"running": _running,
-			"finished": _simulation.is_finished(),
+			"finished": not planning and _simulation.is_finished(),
 			"overlay_visible": _overlay_visible,
 			"log_visible": _log_visible,
-			"variant_index": int(_variant),
-			"variant_name": current_variant_name(),
 			"speed_index": _speed_index,
 			"speed_multiplier": playback_speed(),
 			"speed_label": playback_speed_label(),

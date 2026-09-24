@@ -1,4 +1,4 @@
-## HUD L0: wybór wariantu incydentu, tempo podglądu, stan symulacji, komunikat
+## HUD: faza planowania i nocy, tempo podglądu, stan symulacji, komunikat
 ## końcowy, panel zdarzeń i legenda sterowania.
 ##
 ## HUD jest pasywny. Nie zna FSM, ticków ani danych scenariusza — wyświetla to,
@@ -11,26 +11,35 @@ extends Control
 signal start_requested
 signal pause_toggle_requested
 signal restart_requested
-## Prośba o przełączenie wariantu incydentu. Decyzję podejmuje koordynator.
-signal variant_requested(variant_index: int)
 ## Prośba o zmianę tempa podglądu. Zmiany dokonuje koordynator.
 signal speed_requested(speed_index: int)
 ## Prośba o cofnięcie lub wykonanie jednego ticka.
 signal step_back_requested
 signal step_forward_requested
+## Prośby o przejście między fazami i o plan domyślny. Decyzję podejmuje koordynator.
+signal run_requested
+signal plan_requested
+signal default_plan_requested
+
+## Nazwy faz przekazywane w `ui_state["phase"]`.
+const PHASE_PLAN := "PLAN"
+const PHASE_RUN := "NOC"
 
 ## Ile ostatnich zdarzeń pokazuje panel. Wartość wynika z dostępnej wysokości:
-## nagłówek, pusty wiersz i 11 wpisów mieszczą się w słupku HUD przy 1280 × 800.
-const LOG_LINES := 11
+## nagłówek i 10 wpisów (11 wierszy po ok. 19,8 px) mieszczą się w 234 px słupka
+## HUD przy 1280 × 800. Incydenty L0 miały najwyżej 10 zdarzeń, więc dawny
+## limit 11 wpisów z pustym wierszem nigdy się nie zapełnił — plan domyślny L1-A
+## ma ich 13 i wypychał panel poza ekran.
+const LOG_LINES := 10
 
 ## Panel zdarzeń ma własny, mniejszy rozmiar czcionki. Najdłuższy wiersz to
 ## 70 znaków — powód `intruder_visible_consecutive_ticks` pochodzi z rdzenia
 ## i nie wolno go skracać, więc to rozmiar musi ustąpić, nie treść.
 const LOG_FONT_SIZE := 13
 
-## Komunikat końcowy to najważniejszy tekst na ekranie, a podtytuł scenariusza
-## renderował się od niego większą i jaśniejszą czcionką. Rozmiary przywracają
-## hierarchię: nagłówek wyżej, podpis wyraźnie niżej.
+## Komunikat końcowy to najważniejszy tekst na ekranie, a podtytuł renderował
+## się od niego większą i jaśniejszą czcionką. Rozmiary przywracają hierarchię:
+## nagłówek wyżej, podpis wyraźnie niżej.
 const OUTCOME_FONT_SIZE := 22
 const SCENARIO_FONT_SIZE := 13
 const COLOR_SUBTITLE := Color(0.55, 0.59, 0.66, 1.0)
@@ -46,24 +55,43 @@ const MARKER_INACTIVE := "○ "
 const MARKER_EVENT := "►"
 const MARKER_EVENT_NONE := " "
 
-const COLOR_DETECTED := Color(0.95, 0.35, 0.30, 1.0)
-const COLOR_SUCCESS := Color(0.45, 0.88, 0.50, 1.0)
+## Wynik oceniany z perspektywy obrońcy: wykrycie intruza to sukces gracza.
+const COLOR_DEFENDED := Color(0.45, 0.88, 0.50, 1.0)
+const COLOR_BREACHED := Color(0.95, 0.35, 0.30, 1.0)
 const COLOR_TICK_LIMIT := Color(0.98, 0.72, 0.25, 1.0)
 const COLOR_NEUTRAL := Color(0.82, 0.84, 0.88, 1.0)
+## Komunikat odrzuconej edycji planu.
+const COLOR_REJECTED := Color(0.95, 0.35, 0.30, 1.0)
+
+const SUBTITLE_PLAN := "Faza planowania — ustaw patrol i kamerę, potem uruchom noc"
+const SUBTITLE_RUN := "Noc — deterministyczny przebieg twojego planu"
+
+## Nazwy kierunków kamery w panelu statusu.
+const FACING_NAMES := {
+	Vector2i.UP: "góra",
+	Vector2i.RIGHT: "prawo",
+	Vector2i.DOWN: "dół",
+	Vector2i.LEFT: "lewo",
+}
 
 ## Wiersze mieszczą się w 640 px przy czcionce 16 px o stałej szerokości
 ## (ok. 9,7 px na znak), czyli maksymalnie 65 znaków. Dłuższy wiersz rozepchnąłby
 ## etykietę poza prawą krawędź viewportu.
-const LEGEND := """Sterowanie
-  1 2 3  wariant       [ ]  tempo       Spacja  start / pauza
-  , .  krok wstecz / naprzód      N  tick      R  restart
+const LEGEND_PLAN := """Sterowanie — plan
+  przeciągnij węzeł — patrol · przeciągnij kamerę — pozycja
+  klik w kamerę — obrót · Spacja — uruchom noc
+  R — plan domyślny      [ ]  tempo      F  stożki"""
+
+const LEGEND_RUN := """Sterowanie — noc
+  [ ]  tempo       Spacja  start / pauza      P  wróć do planu
+  , .  krok wstecz / naprzód      N  tick      R  restart nocy
   Home End  początek / koniec     klik w oś czasu  przewiń
   F  stożki      L  panel zdarzeń      Esc  pauza"""
 
 @onready var _scenario_label: Label = $ScenarioLabel
-@onready var _detection_button: Button = $DetectionButton
-@onready var _success_button: Button = $SuccessButton
-@onready var _tick_limit_button: Button = $TickLimitButton
+@onready var _run_button: Button = $RunButton
+@onready var _plan_button: Button = $PlanButton
+@onready var _default_plan_button: Button = $DefaultPlanButton
 @onready var _slow_button: Button = $SlowButton
 @onready var _normal_button: Button = $NormalButton
 @onready var _fast_button: Button = $FastButton
@@ -77,25 +105,29 @@ const LEGEND := """Sterowanie
 @onready var _legend_label: Label = $LegendLabel
 @onready var _log_label: Label = $LogLabel
 
-var _variant_buttons: Array[Button] = []
 var _speed_buttons: Array[Button] = []
 
-var _variant_titles: Array[String] = ["Wykrycie [1]", "Sukces [2]", "Limit ticków [3]"]
 var _speed_titles: Array[String] = ["Wolno 0,5×", "Normalnie 1×", "Szybko 2×"]
 
 
 func _ready() -> void:
+	# Pełnoekranowy korzeń HUD nie może łapać myszy — inaczej kliknięcia
+	# i przeciągnięcia na planszy nie dotarłyby do koordynatora.
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Przycisk z fokusem przechwyciłby Spację, która musi zawsze trafić do
+	# koordynatora (uruchom noc / pauza). Przyciski obsługujemy myszą.
+	for child in get_children():
+		if child is Button:
+			(child as Button).focus_mode = Control.FOCUS_NONE
+
 	_start_button.pressed.connect(func() -> void: start_requested.emit())
 	_pause_button.pressed.connect(func() -> void: pause_toggle_requested.emit())
 	_restart_button.pressed.connect(func() -> void: restart_requested.emit())
 	_step_back_button.pressed.connect(func() -> void: step_back_requested.emit())
 	_step_forward_button.pressed.connect(func() -> void: step_forward_requested.emit())
-
-	_variant_buttons = [_detection_button, _success_button, _tick_limit_button]
-	for index in _variant_buttons.size():
-		var variant := index
-		_variant_buttons[index].pressed.connect(
-			func() -> void: variant_requested.emit(variant))
+	_run_button.pressed.connect(func() -> void: run_requested.emit())
+	_plan_button.pressed.connect(func() -> void: plan_requested.emit())
+	_default_plan_button.pressed.connect(func() -> void: default_plan_requested.emit())
 
 	_speed_buttons = [_slow_button, _normal_button, _fast_button]
 	for index in _speed_buttons.size():
@@ -103,31 +135,87 @@ func _ready() -> void:
 		_speed_buttons[index].pressed.connect(
 			func() -> void: speed_requested.emit(speed))
 
-	_scenario_label.text = "Scenariusz — te same reguły L0, inne dane wejściowe"
-	_legend_label.text = LEGEND
+	_scenario_label.text = SUBTITLE_PLAN
+	_scenario_label.clip_text = true
+	_legend_label.text = LEGEND_PLAN
 	_apply_monospace_font()
 
 
-## [param ui_state] zawiera flagi prezentacji: running, finished,
-## overlay_visible, log_visible, variant_index, variant_name, speed_index,
-## speed_multiplier, speed_label.
+## [param ui_state] zawiera flagi prezentacji: phase, plan_message, running,
+## finished, overlay_visible, log_visible, speed_index, speed_multiplier,
+## speed_label, notable_events.
 func render(snapshot: Dictionary, events: Array[Dictionary], ui_state: Dictionary) -> void:
+	var planning := String(ui_state["phase"]) == PHASE_PLAN
 	var running := bool(ui_state["running"])
 	var finished := bool(ui_state["finished"])
 	var log_visible := bool(ui_state["log_visible"])
-	var status := STATUS_FINISHED if finished else (STATUS_RUNNING if running else STATUS_PAUSED)
 
-	_render_marked_buttons(_variant_buttons, _variant_titles, int(ui_state["variant_index"]))
 	_render_marked_buttons(_speed_buttons, _speed_titles, int(ui_state["speed_index"]))
 
-	_start_button.disabled = running or finished
-	_pause_button.disabled = finished
-	_pause_button.text = "Pauza" if running else "Wznów"
-	_step_back_button.disabled = int(snapshot["tick"]) <= 0
-	_step_forward_button.disabled = finished
+	_run_button.disabled = not planning
+	_plan_button.disabled = planning
+	_default_plan_button.disabled = not planning
 
-	_status_label.text = "\n".join(PackedStringArray([
-		"SCENARIUSZ: %s" % String(ui_state["variant_name"]),
+	_start_button.disabled = planning or running or finished
+	_pause_button.disabled = planning or finished
+	_pause_button.text = "Pauza" if running else "Wznów"
+	_restart_button.disabled = planning
+	_step_back_button.disabled = planning or int(snapshot["tick"]) <= 0
+	_step_forward_button.disabled = planning or finished
+
+	_legend_label.text = LEGEND_PLAN if planning else LEGEND_RUN
+	_render_subtitle(planning, String(ui_state["plan_message"]))
+
+	if planning:
+		_status_label.text = _plan_status_text(snapshot, ui_state)
+		_outcome_label.text = "PLAN OBRONY"
+		_set_outcome_color(COLOR_NEUTRAL)
+	else:
+		_status_label.text = _run_status_text(snapshot, ui_state, running, finished)
+		_render_outcome(String(snapshot["outcome"]), int(snapshot["tick"]))
+	_render_log(events, log_visible, ui_state["notable_events"] as Array[Dictionary])
+
+
+## Panel statusu w fazie planowania: to, co gracz właśnie ustawia.
+func _plan_status_text(snapshot: Dictionary, ui_state: Dictionary) -> String:
+	var waypoints: Array = snapshot["guard_waypoints"]
+	var patrol := PackedStringArray()
+	for i in waypoints.size():
+		patrol.append("W%d %s" % [i + 1, _cell_text(waypoints[i])])
+	var route: Array = snapshot["intruder_route"]
+
+	return "\n".join(PackedStringArray([
+		"FAZA: PLAN — noc jeszcze się nie zaczęła",
+		"",
+		"patrol:    %s" % "  ".join(patrol),
+		"strażnik:  start na W1   zasięg=%d" % int(snapshot["guard_view_range"]),
+		"kamera:    %s  patrzy: %-5s  zasięg=%d" % [
+			_cell_text(snapshot["camera_position"]),
+			_facing_text(snapshot["camera_facing"]),
+			int(snapshot["camera_range"]),
+		],
+		"intruz:    trasa %d komórek   cel %s" % [
+			route.size(),
+			_cell_text(route[route.size() - 1]),
+		],
+		"limit:     %d ticków   (10 Hz)" % int(snapshot["max_ticks"]),
+		"tempo:     %s   [%s]" % [
+			_speed_text(float(ui_state["speed_multiplier"])),
+			String(ui_state["speed_label"]),
+		],
+		"",
+		_toggles_text(ui_state),
+	]))
+
+
+func _run_status_text(
+		snapshot: Dictionary,
+		ui_state: Dictionary,
+		running: bool,
+		finished: bool) -> String:
+	var status := STATUS_FINISHED if finished else (STATUS_RUNNING if running else STATUS_PAUSED)
+	return "\n".join(PackedStringArray([
+		"FAZA: NOC — przebieg twojego planu",
 		"",
 		"status:    %s" % status,
 		"tick:      %d / %d   (10 Hz)" % [int(snapshot["tick"]), int(snapshot["max_ticks"])],
@@ -155,14 +243,26 @@ func render(snapshot: Dictionary, events: Array[Dictionary], ui_state: Dictionar
 			int(snapshot["camera_range"]),
 		],
 		"",
-		"stożki: %s     panel zdarzeń: %s" % [
-			"widoczne" if bool(ui_state["overlay_visible"]) else "ukryte",
-			"widoczny" if log_visible else "ukryty",
-		],
+		_toggles_text(ui_state),
 	]))
 
-	_render_outcome(String(snapshot["outcome"]), int(snapshot["tick"]))
-	_render_log(events, log_visible, ui_state["notable_events"] as Array[Dictionary])
+
+func _toggles_text(ui_state: Dictionary) -> String:
+	return "stożki: %s     panel zdarzeń: %s" % [
+		"widoczne" if bool(ui_state["overlay_visible"]) else "ukryte",
+		"widoczny" if bool(ui_state["log_visible"]) else "ukryty",
+	]
+
+
+## Podtytuł mówi, w jakiej fazie jest gracz. W planowaniu przez 2 s zamienia się
+## w czerwony komunikat odrzuconej edycji — pierwszy problem z `validate()`.
+func _render_subtitle(planning: bool, plan_message: String) -> void:
+	if planning and not plan_message.is_empty():
+		_scenario_label.text = "Odrzucone: " + plan_message
+		_scenario_label.add_theme_color_override("font_color", COLOR_REJECTED)
+		return
+	_scenario_label.text = SUBTITLE_PLAN if planning else SUBTITLE_RUN
+	_scenario_label.add_theme_color_override("font_color", COLOR_SUBTITLE)
 
 
 ## Panel statusu, legenda i event log wyrównują kolumny spacjami, więc wymagają
@@ -190,22 +290,23 @@ func _render_marked_buttons(buttons: Array[Button], titles: Array[String], activ
 		buttons[index].text = marker + titles[index]
 
 
-## Komunikat końcowy: czerwony dla wykrycia, zielony dla sukcesu,
-## pomarańczowy dla wyczerpania limitu ticków. Po zmianie wariantu wraca
-## natychmiast do stanu neutralnego, bo snapshot ma wtedy outcome NONE.
+## Komunikat końcowy z perspektywy obrońcy: zielony, gdy obiekt obroniony
+## (intruz wykryty), czerwony, gdy intruz dotarł do celu, pomarańczowy przy
+## wyczerpaniu limitu ticków. Po restarcie wraca do stanu neutralnego, bo
+## snapshot ma wtedy outcome NONE.
 func _render_outcome(outcome: String, tick: int) -> void:
 	match outcome:
 		SimulationState.OUTCOME_INTRUDER_DETECTED:
-			_outcome_label.text = "INTRUZ WYKRYTY  —  tick %d" % tick
-			_set_outcome_color(COLOR_DETECTED)
+			_outcome_label.text = "OBIEKT ZABEZPIECZONY  —  tick %d" % tick
+			_set_outcome_color(COLOR_DEFENDED)
 		SimulationState.OUTCOME_INTRUDER_SUCCESS:
-			_outcome_label.text = "INTRUZ DOTARŁ DO CELU  —  tick %d" % tick
-			_set_outcome_color(COLOR_SUCCESS)
+			_outcome_label.text = "DANE WYKRADZIONE  —  tick %d  ·  wróć do planu [P]" % tick
+			_set_outcome_color(COLOR_BREACHED)
 		SimulationState.OUTCOME_TICK_LIMIT:
 			_outcome_label.text = "LIMIT TICKÓW WYCZERPANY  —  tick %d" % tick
 			_set_outcome_color(COLOR_TICK_LIMIT)
 		_:
-			_outcome_label.text = "incydent w toku"
+			_outcome_label.text = "noc w toku"
 			_set_outcome_color(COLOR_NEUTRAL)
 
 
@@ -223,7 +324,7 @@ func _render_log(
 	if not log_visible:
 		return
 
-	var lines := PackedStringArray(["event log  (tick | podmiot | zdarzenie | powód)", ""])
+	var lines := PackedStringArray(["event log  (tick | podmiot | zdarzenie | powód)"])
 	if events.is_empty():
 		lines.append("  — brak zdarzeń —")
 	for entry: Dictionary in events:
@@ -245,6 +346,10 @@ func _speed_text(multiplier: float) -> String:
 	if is_equal_approx(multiplier, 2.0):
 		return "2×"
 	return "1×"
+
+
+func _facing_text(facing: Vector2i) -> String:
+	return String(FACING_NAMES.get(facing, "?"))
 
 
 func _cell_text(cell: Vector2i) -> String:
