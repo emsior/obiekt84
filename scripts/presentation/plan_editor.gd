@@ -33,7 +33,11 @@ const COLOR_GHOST_FILL := Color(1.0, 1.0, 1.0, 0.12)
 const LABEL_FONT_SIZE := 13
 const COLOR_LABEL_OUTLINE := Color(0.05, 0.06, 0.08, 0.95)
 
-var _draft: ScenarioL0 = ScenarioL0.create_puzzle()
+## Plik poziomu, z którego pochodzi plan domyślny zagadki — dane, nie kod
+## (`docs/DECISIONS.md`, 2026-09-24, E7).
+const DEFAULT_LEVEL_PATH := "res://levels/puzzle_01.json"
+
+var _draft: ScenarioL0 = load_default_level()
 var _drag_target := TARGET_NONE
 var _drag_origin := Vector2i.ZERO
 var _drag_cell := Vector2i.ZERO
@@ -55,7 +59,32 @@ func set_draft(scenario: ScenarioL0) -> void:
 
 ## Klawisz R w fazie planowania: plan domyślny zagadki.
 func reset_to_puzzle() -> void:
-	set_draft(ScenarioL0.create_puzzle())
+	set_draft(load_default_level())
+
+
+## Czyta plik poziomu i przekazuje tekst parserowi rdzenia. Zwraca to samo co
+## `LevelData.parse`, a gdy pliku nie da się otworzyć — problem odczytu.
+static func load_level_file(path: String) -> Dictionary:
+	var text := FileAccess.get_file_as_string(path)
+	var open_error := FileAccess.get_open_error()
+	if open_error != OK:
+		var problems: Array[String] = ["%s: nie można odczytać pliku (%s)" % [
+			path, error_string(open_error)]]
+		return {"scenario": null, "problems": problems}
+	return LevelData.parse(text)
+
+
+## Plan domyślny z pliku poziomu. Przy jakimkolwiek problemie — głośny błąd
+## i te same dane z kodu (`ScenarioL0.create_puzzle()`), żeby gra wystartowała.
+## Równoważność pliku i kodu pilnuje `tests/test_level_data.gd`.
+static func load_default_level() -> ScenarioL0:
+	var result := load_level_file(DEFAULT_LEVEL_PATH)
+	var problems := PackedStringArray(result["problems"])
+	if problems.is_empty():
+		return result["scenario"]
+	push_error("Poziom %s odrzucony, używam ScenarioL0.create_puzzle(): %s" % [
+		DEFAULT_LEVEL_PATH, "; ".join(problems)])
+	return ScenarioL0.create_puzzle()
 
 
 func is_dragging() -> bool:

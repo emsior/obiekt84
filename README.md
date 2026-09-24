@@ -163,7 +163,7 @@ $env:GODOT_BIN = 'C:\sciezka\do\Godot_v4.7.2-stable_win64_console.exe'
 "%GODOT_BIN%" --headless --path . -s res://addons/gdUnit4/bin/GdUnitCmdTool.gd -a tests --ignoreHeadlessMode
 ```
 
-Wynik ostatniego uruchomienia: **156 przypadków testowych, 0 błędów, 0 failures, 0 flaky, 0 skipped, 0 orphans, exit code 0.**
+Wynik ostatniego uruchomienia: **177 przypadków testowych, 0 błędów, 0 failures, 0 flaky, 0 skipped, 0 orphans, exit code 0.**
 
 Po dodaniu nowego skryptu z `class_name` (np. `PlanEditor`) trzeba raz odświeżyć cache klas globalnych: `"%GODOT_BIN%" --headless --path . --import`. CI robi ten krok przed testami.
 
@@ -255,9 +255,51 @@ Incydent z `ScenarioL0.create()` kończy się w 38 ticku wykryciem intruza przez
 - Patrol zagadki `(10,4) (16,4) (16,7) (10,7)`: sama kamera nie wygrywa w żadnym z 1420 ustawień (test wyczerpujący), plan referencyjny wymaga jednocześnie zmiany patrolu i kamery.
 - Trzy golden logi L0 bez zmian; dwa golden logi zagadki wymienione świadomie (`docs/DECISIONS.md`, 2026-09-24, L1-C).
 
+## Jak dodać poziom
+
+Poziom to plik JSON w `levels/` (format `format_version: 1`, decyzja: `docs/DECISIONS.md`, 2026-09-24, E7). Wzór — plan domyślny zagadki, `levels/puzzle_01.json`:
+
+```json
+{
+  "format_version": 1,
+  "grid": [20, 20],
+  "guard": {
+    "start": [10, 4],
+    "facing": [1, 0],
+    "view_range": 6,
+    "waypoints": [[10, 4], [16, 4], [16, 7], [10, 7]]
+  },
+  "intruder": {
+    "route_corners": [[18, 18], [1, 18], [1, 12], [18, 12]]
+  },
+  "camera": {
+    "position": [3, 3],
+    "facing": [0, 1],
+    "range": 5
+  },
+  "max_ticks": 400
+}
+```
+
+- Współrzędne i rozmiary to `[x, y]` z liczbami całkowitymi; kierunki (`facing`) wyłącznie kardynalne: `[1, 0]`, `[-1, 0]`, `[0, 1]`, `[0, -1]`.
+- `guard.start` musi być równy pierwszemu z **dokładnie czterech** `waypoints`.
+- `intruder.route_corners` to narożniki trasy; kolejne narożniki muszą leżeć w jednej osi, a trasa między nimi rozwija się komórka po komórce.
+- Kamera nie może stać na trasie intruza ani na węźle patrolu.
+- Zestaw pól jest zamknięty: brakujące albo nieznane pole, liczba niecałkowita czy zły typ odrzucają cały plik z komunikatem wskazującym pole. `LevelData.parse(text)` zwraca `{scenario, problems}`.
+- Wyjątek: zduplikowany klucz w obiekcie JSON nie jest wykrywany — parser JSON Godota bierze ostatnią wartość. Każde pole wpisuj raz.
+
+Sprawdzenie nowego pliku bez uruchamiania gry — w teście GdUnit4 albo skrypcie:
+
+```gdscript
+var result := LevelData.parse(FileAccess.get_file_as_string("res://levels/moj_poziom.json"))
+print(result["problems"])   # pusta lista = poziom poprawny
+```
+
+Edytor planu wczytuje dziś wyłącznie `levels/puzzle_01.json`; wybór poziomu w UI należy do kolejnego etapu (E4). Pliki `levels/*.json` trafiają do buildu Web bez zmian w presecie eksportu.
+
 ## Świadome ograniczenia tej iteracji
 
-- **Edytor zmienia tylko patrol i kamerę.** Trasa intruza, zasięgi, liczba waypointów i limit ticków pozostają danymi w `scripts/core/scenario_l0.gd`. Planu nie da się zapisać.
+- **Edytor zmienia tylko patrol i kamerę.** Trasa intruza, zasięgi, liczba waypointów i limit ticków pochodzą z pliku poziomu (`levels/puzzle_01.json`). Planu gracza nie da się zapisać.
 - Brak pathfindingu: intruz ma kompletną listę komórek, strażnik chodzi regułą „najpierw oś X, potem oś Y". Żadnego AStar, NavMesh ani `NavigationAgent2D`.
 - Brak ścian i pól zablokowanych: w danych scenariusza nie istnieje takie pojęcie, więc nie ma też okluzji ani algorytmu linii widzenia — FOV to czysty test stożka.
 - Brak dźwięku, animacji, shaderów, zapisu, ekonomii, metaprogresji i generowania proceduralnego.
@@ -267,13 +309,14 @@ Incydent z `ScenarioL0.create()` kończy się w 38 ticku wykryciem intruza przez
 ## Struktura
 
 ```text
-scripts/core/        rdzeń domenowy (RefCounted, zero node'ów)
+levels/              poziomy jako dane (JSON, format_version 1)
+scripts/core/        rdzeń domenowy (RefCounted, zero node'ów), w tym parser poziomu
 scripts/actors/      FSM strażnika i intruza, kalkulator FOV
 scripts/presentation/ widok poziomu, widok podmiotu, edytor planu, koordynator faz i czasu
 scripts/ui/          HUD
 scenes/              main.tscn, level_l0.tscn
 tests/               testy GdUnit4
-tests/fixtures/      pięć zatwierdzonych golden logów (trzy wyniki L0, dwa plany L1-A)
+tests/fixtures/      pięć zatwierdzonych golden logów (trzy wyniki L0, dwa plany zagadki)
 docs/                MVP_L0, ARCHITECTURE, DECISIONS, PLAYTEST
 addons/gdUnit4/      vendorowany plugin w przypiętej wersji 6.2.1
 ```

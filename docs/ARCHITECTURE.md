@@ -90,6 +90,22 @@ do waypointu poza siatką, intruz przeskakiwałby komórki.
 Walidacja zbiera **wszystkie** problemy naraz. `Simulation.initialize()` zatrzymuje się na
 niepoprawnych danych, zamiast uruchamiać bezwartościowy przebieg. Pokrycie: `tests/test_scenario.gd`.
 
+## Poziom jako dane
+
+```text
+levels/puzzle_01.json ──FileAccess──▶ PlanEditor.load_level_file ──tekst──▶ LevelData.parse ──▶ ScenarioL0 (draft)
+   (prezentacja czyta plik)                                          (rdzeń, bez I/O)            │
+                                                                                                 ▼
+                                                                          Simulation.initialize(draft.duplicate_data())
+```
+
+`LevelData.parse(text)` zwraca `{scenario, problems}`. Parser sprawdza strukturę pliku (zamknięty zestaw kluczy,
+typy, liczby całkowite, dokładnie 4 węzły, narożniki trasy w jednej osi), rozwija trasę `ScenarioL0._build_route()`
+i na końcu woła `ScenarioL0.validate()`. Scenariusz istnieje tylko przy pustej liście problemów. Rdzeń nie wie,
+skąd przyszedł tekst: nie ma w nim `FileAccess`. Przy problemach edytor zgłasza `push_error` i bierze te same dane
+z `ScenarioL0.create_puzzle()`. Równoważność pliku i kodu pilnuje `tests/test_level_data.gd`
+(`docs/DECISIONS.md`, 2026-09-24, E7).
+
 ## Matematyczne FOV
 
 ```gdscript
@@ -134,7 +150,7 @@ Pięć skryptów, jasno rozdzielonych odpowiedzialnościami:
 | Plik | Odpowiedzialność |
 |---|---|
 | `scripts/presentation/simulation_runner.gd` | koordynator: właściciel fazy PLAN/RUN, tempa, wejścia i cyklu życia `Simulation` |
-| `scripts/presentation/plan_editor.gd` | edytor planu: właściciel roboczej kopii `ScenarioL0` (draftu), przeciąganie waypointów i kamery, obrót kamery; rysuje ścieżkę patrolu |
+| `scripts/presentation/plan_editor.gd` | edytor planu: właściciel roboczej kopii `ScenarioL0` (draftu), wczytanie planu domyślnego z `levels/puzzle_01.json`, przeciąganie waypointów i kamery, obrót kamery; rysuje ścieżkę patrolu |
 | `scripts/presentation/level_view.gd` | rysuje planszę, aktorów, trasę i stożki ze snapshotu |
 | `scripts/presentation/timeline_view.gd` | rysuje oś czasu przebiegu; odwzorowuje piksel na tick |
 | `scripts/ui/hud.gd` | pasywny HUD: wyświetla to, co dostanie, i emituje intencje sygnałami |

@@ -1,0 +1,19 @@
+{
+  "format_version": 1,
+  "grid": [20, 20],
+  "guard": {
+    "start": [10, 4],
+    "facing": [1, 0],
+    "view_range": 6,
+    "waypoints": [[10, 4], [16, 4], [16, 12], [10, 12]]
+  },
+  "intruder": {
+    "route_corners": [[18, 18], [1, 18], [1, 12], [18, 12]]
+  },
+  "camera": {
+    "position": [3, 3],
+    "facing": [0, 1],
+    "range": 5
+  },
+  "max_ticks": 400
+}

@@ -280,3 +280,28 @@ Dane bez zmiany reguły tego nie naprawią: krótszy zasięg kamery nadal daje w
 - **Trzy golden logi L0 bez zmian** (diff pusty): w przebiegach `ScenarioL0.create()` kamera `(3,3)` patrzy w dół z zasięgiem 5 i nie sięga trasy intruza (najmniejsze y = 12), więc nikt nie jest namierzany.
 - **Oba golden logi zagadki świadomie wymienione** (ta sama nazwa plików, nowa treść, wygenerowane silnikiem skryptem spoza repo i porównane ze studium): `l0_puzzle_default_golden_log.txt` — strażnik w ogóle nie widzi intruza, `INTRUDER_SUCCESS` w 40 ticku; `l0_puzzle_solution_golden_log.txt` — `MARKED` w 31, `SUSPICION` + `ALARM` w 32, `INTRUDER_DETECTED` przez `guard_alarm` w 32. Zastępuje to dane zagadki i rozwiązanie z wpisu L1-A powyżej.
 - W istniejących testach zmieniły się wyłącznie dane zagadki (węzeł, ticki, powód, nazwa testu rozwiązania); na HEAD `16b6f88` z nową regułą czerwieniało 21 testów, plus 2 testy planu domyślnego zależne od fixture'u. Żaden test ścieżki bez namierzenia nie został osłabiony.
+
+---
+
+## 2026-09-24 — Poziom jako dane (E7, L1-D)
+
+**Decyzja:** poziom to plik `levels/*.json` (`format_version: 1`), a nie kod. Pola odpowiadają `ScenarioL0`: `grid`, `guard` (`start`, `facing`, `view_range`, dokładnie 4 `waypoints`), `intruder.route_corners` (rozwijane istniejącym `ScenarioL0._build_route()`), `camera` (`position`, `facing`, `range`), `max_ticks`; współrzędne jako `[x, y]`. Parser `scripts/core/level_data.gd` (`LevelData.parse(text)`) jest w rdzeniu i nie robi I/O — plik czyta prezentacja (`PlanEditor.load_level_file`). Edytor planu bierze plan domyślny z `res://levels/puzzle_01.json`; przy jakimkolwiek problemie zgłasza `push_error` i wraca do `ScenarioL0.create_puzzle()`.
+
+**Uzasadnienie:** plan nadrzędny (`PLAN_OBIEKT84_od-konca_v0.md`) wymaga szybkiej iteracji poziomów pod playtesty; E7 („format danych poziomu + loader”) jest w tygodniu 1 i blokuje E4 (kolejne poziomy) oraz E2 (ślepe playtesty). Dopóki zagadka była kodem, każdy wariant wymagał zmiany rdzenia.
+
+**Napięcie z `CLAUDE.md` i jego rozstrzygnięcie.** `CLAUDE.md` mówi: „Priorytetem jest działający i deterministyczny L0, nie architektura pod przyszłe poziomy.” L1-D to wprost przygotowanie pod kolejne poziomy. Rozstrzygnięcie: to zdanie ustalało priorytet iteracji L0, a L0 jest domknięty (wszystkie kryteria w `docs/MVP_L0.md`). L1-D nie dodaje niczego z listy „poza zakresem” — brak zapisu gry, kampanii, generowania proceduralnego, zmiennej liczby węzłów, ścian. Plan etapu zatwierdził użytkownik (2026-09-24, 16:18 UTC, okno sesji B), a C zatwierdził plan implementacji z warunkami. `CLAUDE.md` pozostaje bez zmian — jego zmiana należy wyłącznie do użytkownika.
+
+**Zasady parsera:**
+
+- Żadnej cichej korekty. Brak pola, nieznane pole, zły typ, zła liczba współrzędnych, liczba niecałkowita, wartość poza ±1 000 000, `format_version` ≠ 1 i para kolejnych `route_corners` spoza jednej osi (rozwinięcie po cichu dopowiedziałoby zakręt) to problemy z pełną ścieżką pola. Na końcu `ScenarioL0.validate()`.
+- `JSON` zwraca każdą liczbę jako float — także w buildzie Web (sonda S1 sesji B). Parser konwertuje ją jawnie na int; float nigdy nie trafia do scenariusza.
+- Kolejność komunikatów jest deterministyczna: pola w jawnej kolejności, nieznane klucze po posortowaniu.
+- Scenariusz istnieje wyłącznie przy pustej liście problemów.
+- **Wyjątek: zduplikowany klucz** w obiekcie JSON nie jest wykrywany — parser JSON Godota 4.7.2 bierze ostatnią wartość (np. `"max_ticks": 400, "max_ticks": 7` daje 7 bez problemu; potwierdziła to recenzja sesji B). Wykrycie wymagałoby własnego tokenizera, co jest poza zakresem E7.
+
+**Konsekwencje:**
+
+- `levels/puzzle_01.json` ≡ `ScenarioL0.create_puzzle()`, `levels/l0_incident.json` ≡ `ScenarioL0.create()`. **Obie fabryki zostają** jako drugie źródło tych samych danych, bo korzystają z nich golden testy. Rozjazd kodu i pliku łapie `tests/test_level_data.gd` (równoważność pole po polu refleksją oraz przebieg z pliku bajt w bajt równy `l0_incident_golden_log.txt` i `l0_puzzle_default_golden_log.txt`). Usunięcie fabryk to osobna decyzja po E4.
+- Reguły gry, rdzeń symulacji i wszystkie 5 golden logów bez zmian.
+- Eksport bez zmian: sonda S1 potwierdziła, że `levels/*.json` trafia do `index.pck` przy obecnym presecie (`export_filter="all_resources"`), Godot 4.7.2 nie tworzy dla `.json` pliku `.import`, a build Web czyta go przez `FileAccess`.
+- Poza zakresem: hot reload, wybór poziomu w HUD, wielu strażników i intruzów, zapis planu gracza.
