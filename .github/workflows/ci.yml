@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request: # nigdy pull_request_target
+  workflow_dispatch: # ręczne przebudowanie i wdrożenie Pages
 
 permissions:
   contents: read
@@ -64,7 +65,8 @@ jobs:
 
   deploy-pages:
     name: GitHub Pages
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Wdrożenie z push i z ręcznego uruchomienia na main; nigdy z pull_request.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: export-web
     runs-on: ubuntu-latest
     timeout-minutes: 10

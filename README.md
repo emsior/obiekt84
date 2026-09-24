@@ -36,6 +36,32 @@ Z terminala, podstawiając własną ścieżkę do binarki Godota:
 
 Build Web: <https://emsior.github.io/obiekt84/>.
 
+### Build Web lokalnie
+
+Preset `Web` jest w `export_presets.cfg`: **bez wątków** (`variant/thread_support=false`), bez rozszerzeń natywnych, bez PWA.
+Build jednowątkowy nie potrzebuje nagłówków COOP/COEP — działa na zwykłym hostingu statycznym (GitHub Pages, dowolny serwer HTTP).
+
+Wymagane są szablony eksportu Godota **4.7.2** dla Web (`web_nothreads_release.zip`) w katalogu szablonów edytora
+(Windows: `%APPDATA%\Godot\export_templates\4.7.2.stable\`). Źródło: oficjalne wydanie `4.7.2-stable` na GitHubie; sumę sprawdź w `SHA512-SUMS.txt` z tego samego wydania.
+
+```bat
+"%GODOT_BIN%" --headless --path . --import
+"%GODOT_BIN%" --headless --path . --export-release "Web" build/web/index.html
+python -m http.server 8060 --bind 127.0.0.1 --directory build/web
+```
+
+Build trafia do `build/web/` — katalog jest ignorowany przez Git i **nigdy nie jest commitowany**; w CI powstaje jako artefakt Pages.
+Gra otwarta przez `file://` nie wystartuje — potrzebny jest serwer HTTP (`index.wasm` musi mieć typ `application/wasm`).
+
+**Smoke test po każdym eksporcie** (w przeglądarce, na `http://127.0.0.1:8060/`):
+
+1. Konsola: tylko trzy wiersze startowe Godota, zero `ERROR`; wszystkie żądania `200`.
+2. Faza PLAN widoczna, oś czasu ukryta.
+3. Klik w kamerę obraca ją; przeciągnięcie węzła i kamery zmienia plan; upuszczenie kamery na trasę daje czerwony komunikat.
+4. `Uruchom noc` → plan domyślny kończy się `DANE WYKRADZIONE — tick 40`.
+5. `Wróć do planu`, kamera na (17,9) w dół → `OBIEKT ZABEZPIECZONY — tick 36`, w logu `camera_detection`.
+6. Klik w oś czasu w nocy przewija przebieg; Spacja nie przewija strony.
+
 ## Jak grać
 
 Bronisz obiektu przed intruzem, który idzie jawną trasą do celu (żółty znacznik). Masz jednego strażnika z czterema punktami patrolu i jedną kamerę.
@@ -135,7 +161,7 @@ $env:GODOT_BIN = 'C:\sciezka\do\Godot_v4.7.2-stable_win64_console.exe'
 "%GODOT_BIN%" --headless --path . -s res://addons/gdUnit4/bin/GdUnitCmdTool.gd -a tests --ignoreHeadlessMode
 ```
 
-Wynik ostatniego uruchomienia: **143 przypadki testowe, 0 błędów, 0 failures, 0 flaky, 0 skipped, 0 orphans, exit code 0.**
+Wynik ostatniego uruchomienia: **144 przypadki testowe, 0 błędów, 0 failures, 0 flaky, 0 skipped, 0 orphans, exit code 0.**
 
 Po dodaniu nowego skryptu z `class_name` (np. `PlanEditor`) trzeba raz odświeżyć cache klas globalnych: `"%GODOT_BIN%" --headless --path . --import`. CI robi ten krok przed testami.
 

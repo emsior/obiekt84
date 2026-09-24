@@ -620,6 +620,46 @@ func test_mouse_drag_on_board_moves_waypoint() -> void:
 		.is_equal(Vector2i(16, 11))
 
 
+## Ta sama operacja co wyżej, ale przez prawdziwą ścieżkę wejścia viewportu
+## (`push_input`): najpierw GUI, dopiero potem `_unhandled_input`. Test wyżej
+## woła `_unhandled_input` wprost, więc nie widzi Controla, który po drodze
+## zjada kliknięcie — w buildzie Web plansza była przez to martwa dla myszy.
+func test_board_mouse_input_reaches_runner_through_viewport() -> void:
+	var runner := scene_runner(MAIN_SCENE)
+	await runner.simulate_frames(1)
+	var scene := runner.scene()
+	var editor := scene.get_node("PlanEditor") as PlanEditor
+	var viewport := scene.get_viewport()
+	var board_origin := (scene.get_node("LevelL0") as Node2D).global_position
+	var half_cell := Vector2.ONE * float(LevelView.CELL_SIZE) * 0.5
+	var from := board_origin + Vector2(Vector2i(16, 8) * LevelView.CELL_SIZE) + half_cell
+	var to := board_origin + Vector2(Vector2i(16, 11) * LevelView.CELL_SIZE) + half_cell
+
+	var press := InputEventMouseButton.new()
+	press.button_index = MOUSE_BUTTON_LEFT
+	press.pressed = true
+	press.position = from
+	press.global_position = from
+	viewport.push_input(press, true)
+	assert_bool(editor.is_dragging()) \
+		.append_failure_message("klikniecie w wezel nie dotarlo do koordynatora - cos w scenie lapie mysz") \
+		.is_true()
+
+	var motion := InputEventMouseMotion.new()
+	motion.position = to
+	motion.global_position = to
+	viewport.push_input(motion, true)
+
+	var release := InputEventMouseButton.new()
+	release.button_index = MOUSE_BUTTON_LEFT
+	release.pressed = false
+	release.position = to
+	release.global_position = to
+	viewport.push_input(release, true)
+
+	assert_bool(editor.is_dragging()).is_false()
+	assert_vector(editor.draft().guard_waypoints[2]).is_equal(Vector2i(16, 11))
+
 ## Pełnoekranowy korzeń HUD nie może łapać myszy, a przyciski nie mogą
 ## przechwytywać Spacji fokusem — inaczej gry nie da się obsłużyć myszą i Spacją.
 func test_hud_does_not_steal_mouse_or_space() -> void:
